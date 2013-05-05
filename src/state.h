@@ -7,13 +7,15 @@
 #include <vector>
 
 #include "dictionary_list.h"
+#include "entity.h"
 
 // I'm not strict about these but if someone specially crafted a replay it could probably
 // do some damage.
+#define MAX_ENTITIES 0x3FFF
 #define MAX_KEY_SIZE 0x400
 #define MAX_MESSAGE_SIZE 0x4000
 #define MAX_SEND_TABLES 0xFFFF
-#define MAX_NONDATATABLE_PROPS 0x3FFF;
+#define MAX_NONDATATABLE_PROPS 0x800
 
 class Class {
 public:
@@ -64,6 +66,12 @@ public:
       const std::string &dt_name, uint32_t num_elements, float low_value, float high_value,
       uint32_t num_bits);
 
+  SendProp(const SendProp &that);
+  SendProp(SendProp &&that);
+  SendProp &operator=(SendProp that);
+
+  friend void swap(SendProp &first, SendProp &second);
+
   SP_Types type;
   std::string var_name;
   uint32_t flags;
@@ -75,14 +83,14 @@ public:
   float low_value;
   float high_value;
   uint32_t num_bits;
+
+  SendProp *array_prop;
 };
 
 class SendTable {
 public:
   SendTable();
   SendTable(const std::string net_table_name, bool needs_decoder);
-
-  void add(const SendProp prop);
 
   std::string net_table_name;
   bool needs_decoder;
@@ -95,7 +103,7 @@ private:
   };
 
 public:
-  DictionaryList<SendProp, unsigned short, std::string, GetSendPropName> props;
+  DictionaryList<SendProp, std::string, GetSendPropName> props;
 };
 
 struct DTProp {
@@ -158,12 +166,13 @@ private:
     }
   };
 
-  DictionaryList<StringTableEntry, unsigned int, std::string, GetEntryKey> entries;
+  DictionaryList<StringTableEntry, std::string, GetEntryKey> entries;
 };
 
 class State {
 public:
   State(uint32_t max_classes);
+  ~State();
 
   const Class &create_class(uint32_t id, std::string dt_name, std::string name);
   SendTable &create_send_table(const std::string net_table_name, bool needs_decoder);
@@ -212,12 +221,13 @@ private:
   };
 
 public:
-  DictionaryList<SendTable, unsigned short, std::string, GetSendTableName> send_tables;
-  DictionaryList<FlatSendTable, unsigned short, std::string, GetFlatSendTableName> flat_send_tables;
+  DictionaryList<SendTable, std::string, GetSendTableName> send_tables;
+  DictionaryList<FlatSendTable, std::string, GetFlatSendTableName> flat_send_tables;
 
-  DictionaryList<StringTable, unsigned int, std::string, GetStringTableName> string_tables;
+  DictionaryList<StringTable, std::string, GetStringTableName> string_tables;
 
   std::vector<Class> classes;
+  Entity *entities;
 };
 
 #endif

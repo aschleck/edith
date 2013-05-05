@@ -1,7 +1,7 @@
 #ifndef _DEBUG_H
 #define _DEBUG_H
 
-void xassert_error(const char *message, ...);
+void xassert_error(const char *message, ...) __attribute__((noreturn));
 
 #define XASSERT(test, msg, ...) do { \
   if (!(test)) { \

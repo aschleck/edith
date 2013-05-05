@@ -30,7 +30,7 @@ void Bitstream::set_position(size_t new_position) {
 
 uint32_t Bitstream::get_bits(size_t n) {
   XASSERT(n <= 32, "Only 32 or fewer bits are supported.");
-  XASSERT(end - position >= n, "Overflow %d - %d >= %d", end, position, n);
+  XASSERT(end - position >= n, "Bitstream overflow %d - %d < %d", end, position, n);
 
   uint32_t a = data[position / 32];
   uint32_t b = data[(position + n - 1) / 32];

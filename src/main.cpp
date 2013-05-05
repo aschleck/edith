@@ -8,8 +8,8 @@
 #include "debug.h"
 #include "decoder.h"
 #include "demo.h"
+#include "entity.h"
 #include "state.h"
-#include "value.h"
 
 #define INSTANCE_BASELINE_TABLE "instancebaseline"
 #define MAX_EDICTS 0x800
@@ -20,7 +20,7 @@ enum UpdateFlag {
   UF_EnterPVS = 4,
 };
 
-State *state = NULL;
+State *state = 0;
 
 uint32_t read_var_int(const char *data, size_t length, size_t *offset) {
   uint32_t b;
@@ -42,8 +42,6 @@ uint32_t read_var_int(const char *data, size_t length, size_t *offset) {
 void dump_SVC_SendTable(const CSVCMsg_SendTable &table) {
   XASSERT(state, "SVC_SendTable but no state created.");
 
-  printf("Got sendtable %s.\n", table.net_table_name().c_str());
-
   SendTable &converted = state->create_send_table(table.net_table_name(), table.needs_decoder());
 
   size_t prop_count = table.props_size();
@@ -61,7 +59,7 @@ void dump_SVC_SendTable(const CSVCMsg_SendTable &table) {
         prop.high_value(),
         prop.num_bits());
 
-    converted.add(c);
+    converted.props.add(c);
   }
 }
 
@@ -118,68 +116,34 @@ unsigned int read_entity_header(int *base, Bitstream &stream) {
   return update_flags;
 }
 
-void read_field(uint32_t &last_field, Bitstream &stream) {
-  if (stream.get_bits(1)) {
-    last_field += 1;
-  } else {
-    size_t start = stream.get_position();
-    uint32_t value = stream.read_var_35();
-
-    if (value == 0x3FFF) {
-      last_field = 0xFFFFFFFF;
-    } else {
-      last_field += value + 1;
-    }
-  }
-}
-
-void read_field_list(std::vector<uint32_t> &fields, Bitstream &stream) {
-  uint32_t last_field = -1;
-  read_field(last_field, stream);
-
-  while (last_field != 0xFFFFFFFF) {
-    fields.push_back(last_field);
-
-    read_field(last_field, stream);
-  }
-}
-
-void read_entity_enter_pvs(uint32_t update_flags, uint32_t entity, Bitstream &stream) {
+void read_entity_enter_pvs(uint32_t entity_id, Bitstream &stream) {
   uint32_t class_i = stream.get_bits(state->class_bits);
   uint32_t serial = stream.get_bits(10);
 
-  XASSERT(entity < MAX_EDICTS, "Entity %ld exceeds max edicts.", entity);
+  XASSERT(entity_id < MAX_EDICTS, "Entity %ld exceeds max edicts.", entity_id);
 
   const Class &clazz = state->get_class(class_i);
-  const StringTableEntry &baseline = get_baseline_for(class_i);
-
   const FlatSendTable &flat_send_table = state->flat_send_tables[clazz.dt_name];
 
-  std::cout << flat_send_table.net_table_name << std::endl;
+  Entity &entity = state->entities[entity_id];
+  entity = Entity(entity_id, flat_send_table);
 
+  const StringTableEntry &baseline = get_baseline_for(class_i);
   Bitstream baseline_stream(baseline.value);
+  entity.update(baseline_stream);
 
-  std::vector<uint32_t> fields;
-  read_field_list(fields, baseline_stream);
+  entity.update(stream);
 
-  for (auto iter = fields.begin(); iter != fields.end(); ++iter) {
-    Value value(flat_send_table.props[*iter]);
-    value.read_from(baseline_stream);
-  }
+  std::cout << "Created a " << clazz.name << " (id=" << entity_id << ", serial=" << serial << ")" << std::endl;
+}
 
-  std::cout << "Done with baseline" << std::endl;
+void read_entity_update(uint32_t entity_id, Bitstream &stream) {
+  XASSERT(entity_id < MAX_ENTITIES, "Entity id too big");
 
-  fields.clear();
-  read_field_list(fields, stream);
+  Entity &entity = state->entities[entity_id];
+  XASSERT(entity.id != -1, "Entity %d is not set up.", entity_id);
 
-  for (auto iter = fields.begin(); iter != fields.end(); ++iter) {
-    Value value(flat_send_table.props[*iter]);
-    value.read_from(stream);
-  }
-
-  std::cout << "Done with stream" << std::endl;
-
-  printf("Created a %s (serial=%u).\n", clazz.name.c_str(), serial);
+  entity.update(stream);
 }
 
 void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
@@ -196,16 +160,25 @@ void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
     printf("Got %d %d.\n", entity_id, update_type);
 
     if (update_type & UF_EnterPVS) {
-      read_entity_enter_pvs(update_type, entity_id, stream);
+      read_entity_enter_pvs(entity_id, stream);
     } else if (update_type & UF_LeavePVS) {
-      XERROR("Not implemented.");
+      XASSERT(entities.is_delta(), "Leave PVS on full update");
+
+      std::cout << "Leave PVS?" << std::endl;
+
+      if (update_type & UF_Delete) {
+        std::cout << "Deleting entity " << entity_id << std::endl;
+        state->entities[entity_id].id = -1;
+      }
     } else {
-      XERROR("Not implemented.");
+      read_entity_update(entity_id, stream);
     }
 
     ++found;
     update_type = read_entity_header(&entity_id, stream);
   }
+
+  XERROR("hmm");
 }
 
 void dump_SVC_ServerInfo(const CSVCMsg_ServerInfo &info) {
@@ -220,6 +193,19 @@ void dump_DEM_ClassInfo(const CDemoClassInfo &info) {
   for (size_t i = 0; i < info.classes_size(); ++i) {
     const CDemoClassInfo_class_t &clazz = info.classes(i);
     state->create_class(clazz.class_id(), clazz.table_name(), clazz.network_name());
+  }
+
+  for (auto iter = state->send_tables.begin(); iter != state->send_tables.end(); ++iter) {
+    SendTable &table = *iter;
+
+    for (size_t i = 0; i < table.props.size(); ++i) {
+      SendProp &prop = table.props[i];
+
+      if (prop.type == SP_Array) {
+        XASSERT(i > 0, "Array prop %s is at index zero.", prop.var_name.c_str());
+        prop.array_prop = &(table.props[i - 1]);
+      }
+    }
   }
 
   state->compile_send_tables();
@@ -243,7 +229,7 @@ void update_string_table(StringTable &table, size_t num_entries, std::string dat
 
     XASSERT(entry_id >= 0, "Entry id is less than zero!");
 
-    char *key = NULL;
+    char *key = 0;
     if (stream.get_bits(1)) {
       key = new char[MAX_KEY_SIZE];
 
@@ -258,7 +244,7 @@ void update_string_table(StringTable &table, size_t num_entries, std::string dat
       }
     }
 
-    char *value = NULL;
+    char *value = 0;
     size_t length;
     if (stream.get_bits(1)) {
       if (!(table.flags & STF_FixedLength)) {
@@ -308,8 +294,6 @@ void update_string_table(StringTable &table, size_t num_entries, std::string dat
 
 void handle_SVC_CreateStringTable(const CSVCMsg_CreateStringTable &table) {
   XASSERT(state, "SVC_CreateStringTable but no state.");
-
-  printf("Got string table %s\n", table.name().c_str());
 
   StringTable &converted = state->create_string_table(table.name(),
       (size_t) table.max_entries(), table.flags(), table.user_data_fixed_size(),

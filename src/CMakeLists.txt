@@ -1,12 +1,13 @@
 cmake_minimum_required(VERSION 2.6)
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++")
+SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lc++")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/../cmake/Modules/")
 
 project(dota)
 
-find_package(ProtocolBuffers REQUIRED)
-include_directories(${PROTOBUF_INCLUDE_DIRS})
+find_package(Protobuf REQUIRED)
+include_directories(${PROTOBUF_INCLUDE_DIR})
 
 find_package(Snappy)
 include_directories(${SNAPPY_INCLUDE_DIRS})

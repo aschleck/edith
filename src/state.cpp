@@ -39,7 +39,46 @@ SendProp::SendProp(SP_Types _type, const std::string &_var_name, uint32_t _flags
   num_elements(_num_elements),
   low_value(_low_value),
   high_value(_high_value),
-  num_bits(_num_bits) {
+  num_bits(_num_bits),
+  array_prop(0) {
+}
+
+SendProp::SendProp(const SendProp &that) {
+  type = that.type;
+  var_name = that.var_name;
+  flags = that.flags;
+  priority = that.priority;
+  dt_name = that.dt_name;
+  num_elements = that.num_elements;
+  low_value = that.low_value;
+  high_value = that.high_value;
+  num_bits = that.num_bits;
+  array_prop = that.array_prop;
+}
+
+SendProp::SendProp(SendProp &&that) {
+  swap(*this, that);
+}
+
+SendProp &SendProp::operator=(SendProp that) {
+  swap(*this, that);
+
+  return *this;
+}
+
+void swap(SendProp &first, SendProp &second) {
+  using std::swap;
+
+  swap(first.type, second.type);
+  swap(first.var_name, second.var_name);
+  swap(first.flags, second.flags);
+  swap(first.priority, second.priority);
+  swap(first.dt_name, second.dt_name);
+  swap(first.num_elements, second.num_elements);
+  swap(first.low_value, second.low_value);
+  swap(first.high_value, second.high_value);
+  swap(first.num_bits, second.num_bits);
+  swap(first.array_prop, second.array_prop);
 }
 
 SendTable::SendTable() {
@@ -47,10 +86,6 @@ SendTable::SendTable() {
 
 SendTable::SendTable(const std::string _net_table_name, bool _needs_decoder) :
   net_table_name(_net_table_name), needs_decoder(_needs_decoder) {
-}
-
-void SendTable::add(const SendProp prop) {
-  props.add(prop);
 }
 
 FlatSendTable::FlatSendTable() {
@@ -105,8 +140,13 @@ StringTableEntry &StringTable::put(const std::string &key, const std::string &va
 }
 
 State::State(uint32_t _max_classes) :
-  max_classes(_max_classes),
-  class_bits(log2(_max_classes)) {
+    max_classes(_max_classes),
+    class_bits(log2(_max_classes)),
+    entities(new Entity[MAX_ENTITIES]()) {
+}
+
+State::~State() {
+  delete[] entities;
 }
 
 const Class &State::create_class(uint32_t id, std::string dt_name, std::string name) {
@@ -129,16 +169,27 @@ StringTable &State::create_string_table(const std::string &name, uint32_t max_en
   return string_tables.add(table);
 }
 
-void State::gather_excludes(const SendTable &table, std::set<std::string> &excluding) {
-  using std::set;
-  using std::string;
+const Class &State::get_class(size_t i) const {
+  XASSERT(i < classes.size(), "Class %ld does not exist (%ld).", i, classes.size());
 
+  return classes[i];
+}
+
+StringTable &State::get_string_table(size_t i) {
+  return string_tables[i];
+}
+
+StringTable &State::get_string_table(const std::string &name) {
+  return string_tables[name];
+}
+
+void State::gather_excludes(const SendTable &table, std::set<std::string> &excluding) {
   for (auto iter = table.props.begin(); iter != table.props.end(); ++iter) {
     const SendProp &prop = *iter;
 
     if (SP_Exclude & prop.flags) {
       excluding.insert(prop.dt_name + prop.var_name);
-    } else if (SP_DataTable == prop.flags) {
+    } else if (SP_DataTable == prop.type) {
       gather_excludes(send_tables[prop.dt_name], excluding);
     }
   }
@@ -242,26 +293,10 @@ void State::compile_send_table(const SendTable &table) {
 }
 
 void State::compile_send_tables() {
-  using namespace std;
-
   for (auto iter = send_tables.begin();
       iter != send_tables.end();
       ++iter) {
     compile_send_table(*iter);
   }
-}
-
-const Class &State::get_class(size_t i) const {
-  XASSERT(i < classes.size(), "Class %ld does not exist (%ld).", i, classes.size());
-
-  return classes[i];
-}
-
-StringTable &State::get_string_table(size_t i) {
-  return string_tables[i];
-}
-
-StringTable &State::get_string_table(const std::string &name) {
-  return string_tables[name];
 }
 
