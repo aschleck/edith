@@ -51,7 +51,9 @@ void Entity::update(Bitstream &stream) {
   for (auto iter = fields.begin(); iter != fields.end(); ++iter) {
     uint32_t i = *iter;
 
-    std::cout << "Updating " << table->props[i]->var_name << std::endl;
+    std::cout << table->props[i]->var_name << " " <<
+      table->props[i]->type << " " <<
+      table->props[i]->flags << ": ";
     properties[i] = Property::read_prop(stream, table->props[i]);
   }
 }

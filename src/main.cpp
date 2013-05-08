@@ -96,9 +96,17 @@ const StringTableEntry &get_baseline_for(int class_i) {
   return instance_baseline.get(buf);
 }
 
-unsigned int read_entity_header(int *base, Bitstream &stream) {
-  int new_entity = *base + 1 + stream.read_var_uint();
-  *base = new_entity;
+uint32_t read_entity_header(uint32_t *base, Bitstream &stream) {
+  uint32_t value = stream.get_bits(6);
+
+  if (value & 0x30) {
+    uint32_t a = (value >> 4) & 3;
+    uint32_t b = (a == 3) ? 16 : 0;
+
+    value = stream.get_bits(4 * a + b) << 4 | (value & 0xF);
+  }
+
+  *base += value + 1;
 
   unsigned int update_flags = 0;
 
@@ -126,6 +134,7 @@ void read_entity_enter_pvs(uint32_t entity_id, Bitstream &stream) {
   const FlatSendTable &flat_send_table = state->flat_send_tables[clazz.dt_name];
 
   Entity &entity = state->entities[entity_id];
+  XASSERT(entity.id == -1, "Entity %d already exists.", entity_id);
   entity = Entity(entity_id, flat_send_table);
 
   const StringTableEntry &baseline = get_baseline_for(class_i);
@@ -144,20 +153,30 @@ void read_entity_update(uint32_t entity_id, Bitstream &stream) {
   XASSERT(entity.id != -1, "Entity %d is not set up.", entity_id);
 
   entity.update(stream);
+
+  std::cout << "Updated a " << entity.table->net_table_name << std::endl;
 }
 
 void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
+  static size_t num = 0;
+  if (++num == 1) {
+    return;
+  }
+
+  std::cout << num << std::endl;
   printf("pe is_delta? %d update_baseline? %d baseline? %d delta_from? %d updated_entries? %d size? %ld\n", entities.is_delta(),
       entities.update_baseline(), entities.baseline(), entities.delta_from(), entities.updated_entries(), entities.entity_data().length());
 
   Bitstream stream(entities.entity_data());
 
-  int entity_id = -1;
-  int found = 0;
-  uint32_t update_type = read_entity_header(&entity_id, stream);
+  uint32_t entity_id = -1;
+  size_t found = 0;
+  uint32_t update_type;
 
   while (found < entities.updated_entries()) {
-    printf("Got %d %d.\n", entity_id, update_type);
+    update_type = read_entity_header(&entity_id, stream);
+
+    //printf("Got %d %d.\n", entity_id, update_type);
 
     if (update_type & UF_EnterPVS) {
       read_entity_enter_pvs(entity_id, stream);
@@ -175,10 +194,7 @@ void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
     }
 
     ++found;
-    update_type = read_entity_header(&entity_id, stream);
   }
-
-  XERROR("hmm");
 }
 
 void dump_SVC_ServerInfo(const CSVCMsg_ServerInfo &info) {
@@ -312,6 +328,12 @@ void handle_SVC_UpdateStringTable(const CSVCMsg_UpdateStringTable &update) {
   update_string_table(table, update.num_changed_entries(), update.string_data());
 }
 
+void clear_entities() {
+  for (size_t i = 0; i < MAX_ENTITIES; ++i) {
+    state->entities[i].id = -1;
+  }
+}
+
 void dump_DEM_Packet(const CDemoPacket &packet) {
   const char *data = packet.data().c_str();
   size_t offset = 0;
@@ -376,14 +398,12 @@ void dump(const char *file) {
       CDemoFullPacket packet;
       packet.ParseFromArray(demo.expose_buffer(), uncompressed_size);
 
-      printf("Read full packet (%lu/%lu).\n", size, uncompressed_size);
-      printf("%s\n", packet.string_table().DebugString().c_str());
+      clear_entities();
       dump_DEM_Packet(packet.packet());
     } else if (command == DEM_Packet || command == DEM_SignonPacket) {
       CDemoPacket packet;
       packet.ParseFromArray(demo.expose_buffer(), uncompressed_size);
 
-      printf("Read packet (%lu/%lu).\n", size, uncompressed_size);
       dump_DEM_Packet(packet);
     } else {
       //printf("Skipped command %u %lu (%lu) bytes.\n", command, size, uncompressed_size);

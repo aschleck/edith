@@ -201,7 +201,7 @@ void State::gather(const SendTable &from, DTProp &dt_prop, CompileState &state) 
       ++iter) {
     const SendProp &prop = *iter;
 
-    if (SP_InsideArray & prop.flags) {
+    if ((SP_Exclude | SP_InsideArray) & prop.flags) {
       continue;
     } else if (state.excluding.count(from.net_table_name + prop.var_name)) {
       continue;

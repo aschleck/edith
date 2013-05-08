@@ -44,8 +44,8 @@ enum SP_Flags {
   SP_CellCoord = 1 << 15,
   SP_CellCoordLowPrecision = 1 << 16,
   SP_CellCoordIntegral = 1 << 17,
-
   SP_ChangesOften = 1 << 18,
+  SP_EncodedAgainstTickcount = 1 << 19,
 };
 
 enum SP_Types {

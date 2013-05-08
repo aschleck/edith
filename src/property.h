@@ -2,6 +2,7 @@
 #define _PROPERTY_H
 
 #include <algorithm>
+#include <iostream>
 #include <memory>
 #include <vector>
 
@@ -24,6 +25,7 @@ class TypedProperty : public Property {
 public:
   TypedProperty(const std::string &_name, T _value) :
       Property(_name, SendPropType), value(_value) {
+    std::cout << _value << std::endl;
   }
 
   T value;
@@ -32,9 +34,14 @@ public:
 template<SP_Types SendPropType, typename T, size_t C>
 class FixedTypedProperty : public Property {
 public:
-  FixedTypedProperty(const std::string &_name, T _value[C]) :
-    Property(_name, SendPropType) {
-      std::copy(_value, _value + C, values);
+  FixedTypedProperty(const std::string &_name, T _values[C]) :
+      Property(_name, SendPropType) {
+    std::copy(_values, _values + C, values);
+
+    for (size_t i = 0; i < C; ++i) {
+      std::cout << values[i] << ", ";
+    }
+    std::cout << std::endl;
   }
 
   T values[C];
@@ -63,6 +70,7 @@ typedef FixedTypedProperty<SP_Vector, float, 3> VectorProperty;
 typedef FixedTypedProperty<SP_VectorXY, float, 2> VectorXYProperty;
 typedef TypedProperty<SP_String, std::string> StringProperty;
 typedef TypedProperty<SP_Array, ArrayPropertyElement> ArrayProperty;
+typedef TypedProperty<SP_Int64, uint64_t> Int64Property;
 
 #endif
 

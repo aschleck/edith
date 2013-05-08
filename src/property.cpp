@@ -6,7 +6,7 @@
 #define MAX_STRING_LENGTH 0x200
 
 uint32_t read_int(Bitstream &stream, const SendProp *prop) {
-  if (prop->flags & SP_CoordMpLowPrecision) {
+  if (prop->flags & SP_EncodedAgainstTickcount) {
     if (prop->flags & SP_Unsigned) {
       return stream.read_var_35();
     } else {
@@ -37,22 +37,23 @@ float read_float_coord(Bitstream &stream) {
     }
 
     if (second) {
-      second = stream.get_bits(4);
+      second = stream.get_bits(5);
     }
 
+    b = _mm_cvtsi32_si128(first);
     a = _mm_cvtsi32_ss(a, second);
+
     __m128 special = _mm_setr_epi32(0x3D000000, 0, 0, 0);
     a = _mm_mul_ss(a, special);
     a = _mm_cvtps_pd(a);
 
-    b = _mm_cvtsi32_si128(first);
     b = _mm_cvtepi32_pd(b);
-
+    
     a = _mm_add_sd(a, b);
     a = _mm_cvtpd_ps(a);
 
     if (third) {
-      __m128 mask = _mm_set_epi32(0x80000000, 0x80000000, 0x80000000, 0x80000000);
+      __m128 mask = _mm_set1_epi32(0x80000000);
       a = _mm_xor_ps(a, mask);
     }
   }
@@ -124,12 +125,21 @@ float read_float_no_scale(Bitstream &stream) {
 }
 
 float read_float_normal(Bitstream &stream) {
-  XERROR("no normals tia");
-  uint32_t value = stream.get_bits(32);
+  uint32_t first = stream.get_bits(1);
+  uint32_t second = stream.get_bits(11);
 
-  __m128 a = _mm_setzero_si128();
-  a = _mm_cvtsi32_ss(a, value);
-  float f;
+  float f = second;
+
+  if (second >> 31) {
+    f += 4.2949673e9;
+  }
+
+  f *= 4.885197850512946e-4;
+
+  __m128 a = _mm_load_ss(&f);
+  __m128 mask = _mm_set_epi32(0x80000000, 0x80000000, 0x80000000, 0x80000000);
+  a = _mm_xor_ps(a, mask);
+
   _mm_store_ss(&f, a);
 
   return f;
@@ -198,6 +208,8 @@ float read_float(Bitstream &stream, const SendProp *prop) {
     return read_float_coord_mp(stream, FT_Integral);
   } else if (prop->flags & SP_NoScale) {
     return read_float_no_scale(stream);
+  } else if (prop->flags & SP_Normal) {
+    return read_float_normal(stream);
   } else if (prop->flags & SP_CellCoord) {
     return read_float_cell_coord(stream, FT_None, prop->num_bits);
   } else if (prop->flags & SP_CellCoordLowPrecision) {
@@ -301,6 +313,35 @@ void read_array(std::vector<ArrayPropertyElement> &elements, Bitstream &stream,
   }
 }
 
+uint64_t read_int64(Bitstream &stream, const SendProp *prop) {
+  if (SP_EncodedAgainstTickcount & prop->flags) {
+    XERROR("this sounds scary");
+  } else {
+    bool negate = false;
+    size_t second_bits = prop->num_bits - 32;
+
+    if (!(SP_Unsigned & prop->flags)) {
+      --second_bits;
+
+      if (stream.get_bits(1)) {
+        negate = true;
+      }
+    }
+
+    XASSERT(prop->num_bits >= second_bits, "Invalid number of bits");
+
+    uint64_t a = stream.get_bits(32);
+    uint64_t b = stream.get_bits(second_bits);
+    uint64_t value = (a << 32) | b;
+
+    if (negate) {
+      value *= -1;
+    }
+
+    return value;
+  }
+}
+
 std::shared_ptr<Property> Property::read_prop(Bitstream &stream, const SendProp *prop) {
   Property *out;
 
@@ -328,6 +369,8 @@ std::shared_ptr<Property> Property::read_prop(Bitstream &stream, const SendProp 
     read_array(elements, stream, prop);
 
     out = new ArrayProperty(prop->var_name, elements, prop->array_prop->type);
+  } else if (prop->type == SP_Int64) {
+    out = new Int64Property(prop->var_name, read_int64(stream, prop));
   } else {
     XERROR("Unknown send prop type %d", prop->type);
   }
