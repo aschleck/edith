@@ -13,6 +13,8 @@
 
 #define INSTANCE_BASELINE_TABLE "instancebaseline"
 #define MAX_EDICTS 0x800
+#define MAX_KEY_SIZE 0x400
+#define MAX_VALUE_SIZE 0x4000
 
 enum UpdateFlag {
   UF_LeavePVS = 1,
@@ -134,8 +136,7 @@ void read_entity_enter_pvs(uint32_t entity_id, Bitstream &stream) {
   const FlatSendTable &flat_send_table = state->flat_send_tables[clazz.dt_name];
 
   Entity &entity = state->entities[entity_id];
-  XASSERT(entity.id == -1, "Entity %d already exists.", entity_id);
-  entity = Entity(entity_id, flat_send_table);
+  entity = Entity(entity_id, clazz, flat_send_table);
 
   const StringTableEntry &baseline = get_baseline_for(class_i);
   Bitstream baseline_stream(baseline.value);
@@ -143,7 +144,7 @@ void read_entity_enter_pvs(uint32_t entity_id, Bitstream &stream) {
 
   entity.update(stream);
 
-  std::cout << "Created a " << clazz.name << " (id=" << entity_id << ", serial=" << serial << ")" << std::endl;
+  //std::cout << "Created a " << clazz.name << " (id=" << entity_id << ", serial=" << serial << ")" << std::endl;
 }
 
 void read_entity_update(uint32_t entity_id, Bitstream &stream) {
@@ -154,7 +155,7 @@ void read_entity_update(uint32_t entity_id, Bitstream &stream) {
 
   entity.update(stream);
 
-  std::cout << "Updated a " << entity.table->net_table_name << std::endl;
+  //std::cout << "Updated a " << entity.table->net_table_name << std::endl;
 }
 
 void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
@@ -163,9 +164,8 @@ void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
     return;
   }
 
-  std::cout << num << std::endl;
-  printf("pe is_delta? %d update_baseline? %d baseline? %d delta_from? %d updated_entries? %d size? %ld\n", entities.is_delta(),
-      entities.update_baseline(), entities.baseline(), entities.delta_from(), entities.updated_entries(), entities.entity_data().length());
+  //printf("pe is_delta? %d update_baseline? %d baseline? %d delta_from? %d updated_entries? %d size? %ld\n", entities.is_delta(),
+  //    entities.update_baseline(), entities.baseline(), entities.delta_from(), entities.updated_entries(), entities.entity_data().length());
 
   Bitstream stream(entities.entity_data());
 
@@ -194,6 +194,13 @@ void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
     }
 
     ++found;
+  }
+
+  std::cout << "Remaining: " << stream.get_end() - stream.get_position() << std::endl;
+  if (entities.is_delta()) {
+    while (stream.get_bits(1)) {
+      std::cout << "Delete " << stream.get_bits(11) << std::endl;
+    }
   }
 }
 
@@ -228,80 +235,81 @@ void dump_DEM_ClassInfo(const CDemoClassInfo &info) {
 }
 
 void update_string_table(StringTable &table, size_t num_entries, std::string data) {
+  if (table.flags & ST_Something) {
+    std::cout << "ST_Something table " << table.name << " was skipped" << std::endl;
+    return;
+  }
+
   Bitstream stream(data);
 
-  size_t entries_read = 0;
-  
-  uint32_t some_var = stream.get_bits(1);
-  uint32_t some_other_var_4854 = 0;
+  uint32_t first = stream.get_bits(1);
 
-  int32_t entry_id = -1;
+  std::cout << table.name << std::endl;
+  std::cout << table.flags << std::endl;
+
+  uint32_t entry_id = -1;
+  size_t entries_read = 0;
   while (entries_read < num_entries) {
     if (!stream.get_bits(1)) {
       entry_id = stream.get_bits(table.entry_bits);
     } else {
-      entry_id = entry_id + 1;
+      entry_id += 1;
     }
 
-    XASSERT(entry_id >= 0, "Entry id is less than zero!");
+    XASSERT(entry_id < table.max_entries, "Entry id too large");
 
+    char key_buffer[MAX_KEY_SIZE];
     char *key = 0;
     if (stream.get_bits(1)) {
-      key = new char[MAX_KEY_SIZE];
-
-      if (!some_var) {
-        if (!stream.get_bits(1)) {
-          stream.read_string(key, MAX_KEY_SIZE);
-        } else {
-          XERROR("no");
-        }
-      } else {
+      if (first && stream.get_bits(1)) {
         XERROR("please no");
-      }
-    }
-
-    char *value = 0;
-    size_t length;
-    if (stream.get_bits(1)) {
-      if (!(table.flags & STF_FixedLength)) {
-        length = stream.get_bits(14);
-
-        XASSERT(length < MAX_MESSAGE_SIZE, "Message too long.");
       } else {
+        if (stream.get_bits(1)) {
+          uint32_t a = stream.get_bits(5);
+          uint32_t b = stream.get_bits(5) + 1;
+
+          std::cout << "Copying " << b << " of " << a << std::endl;
+
+          // copy bits and then append:
+          stream.read_string(key_buffer, MAX_KEY_SIZE);
+        } else {
+          stream.read_string(key_buffer, MAX_KEY_SIZE);
+          key = key_buffer;
+        }
+      }
+    }
+
+    char value_buffer[MAX_VALUE_SIZE];
+    char *value = 0;
+    size_t bit_length, length;
+    if (stream.get_bits(1)) {
+      if (table.flags & ST_FixedLength) {
         length = table.user_data_size;
+        bit_length = table.user_data_size_bits;
+      } else {
+        length = stream.get_bits(14);
+        bit_length = 8 * length;
       }
 
-      value = new char[length];
-      stream.read_bits(value, 8 * length);
+      XASSERT(length < MAX_VALUE_SIZE, "Message too long.");
+
+      stream.read_bits(value_buffer, bit_length);
     }
 
-    if (some_other_var_4854 >= 31) {
-      --some_other_var_4854;
-
-      if (some_other_var_4854 > 0) {
-        XERROR("no stop");
-      }
-    }
-
-    StringTableEntry *item;
     if (entry_id < table.count()) {
-      item = &(table.get(entry_id));
+      StringTableEntry &item = table.get(entry_id);
 
-      XASSERT(item->key == key, "Entry's keys don't match.");
+      if (key) {
+        XASSERT(item.key == key, "Entry's keys don't match.");
+      }
+
+      if (value) {
+        item.value = std::string(value, length);
+      }
     } else {
       XASSERT(key, "Creating a new string table entry but no key specified.");
 
-      // value should be null? may cause issues?
-      item = &(table.put(key, ""));
-    }
-
-    if (key) {
-      delete[] key;
-    }
-
-    if (value) {
-      item->value = std::string(value, length);
-      delete[] value;
+      table.put(key, std::string(value_buffer, length));
     }
 
     ++entries_read;
@@ -325,7 +333,11 @@ void handle_SVC_UpdateStringTable(const CSVCMsg_UpdateStringTable &update) {
   XASSERT(state, "SVC_UpdateStringTable but no state.");
 
   StringTable &table = state->get_string_table(update.table_id());
-  update_string_table(table, update.num_changed_entries(), update.string_data());
+
+  // I don't want to deal with other string tables right now.
+  if (table.name == "instancebaseline") {
+    update_string_table(table, update.num_changed_entries(), update.string_data());
+  }
 }
 
 void clear_entities() {
@@ -384,6 +396,8 @@ void dump(const char *file) {
     EDemoCommands command = demo.get_message_type(&tick, &compressed);
     demo.read_message(compressed, &size, &uncompressed_size);
 
+    std::cout << "Tick " << tick << std::endl;
+
     if (command == DEM_ClassInfo) {
       CDemoClassInfo info;
       info.ParseFromArray(demo.expose_buffer(), uncompressed_size);
@@ -406,7 +420,7 @@ void dump(const char *file) {
 
       dump_DEM_Packet(packet);
     } else {
-      //printf("Skipped command %u %lu (%lu) bytes.\n", command, size, uncompressed_size);
+      printf("Skipped command %u %lu (%lu) bytes.\n", command, size, uncompressed_size);
     }
   }
 }

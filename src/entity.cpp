@@ -6,10 +6,11 @@
 #include "state.h"
 #include "property.h"
 
-Entity::Entity() : id(-1), table(0) {
+Entity::Entity() : id(-1), clazz(0), table(0) {
 }
 
-Entity::Entity(uint32_t _id, const FlatSendTable &_table) : id(_id), table(&_table) {
+Entity::Entity(uint32_t _id, const Class &_clazz, const FlatSendTable &_table) :
+    id(_id), clazz(&_clazz), table(&_table) {
   size_t prop_count = table->props.size();
   properties.reserve(prop_count);
 
@@ -51,9 +52,9 @@ void Entity::update(Bitstream &stream) {
   for (auto iter = fields.begin(); iter != fields.end(); ++iter) {
     uint32_t i = *iter;
 
-    std::cout << table->props[i]->var_name << " " <<
-      table->props[i]->type << " " <<
-      table->props[i]->flags << ": ";
+    //std::cout << table->props[i]->var_name << " " <<
+    //  table->props[i]->type << " " <<
+    //  table->props[i]->flags << ": ";
     properties[i] = Property::read_prop(stream, table->props[i]);
   }
 }

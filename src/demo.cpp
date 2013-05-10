@@ -52,13 +52,14 @@ char *Demo::expose_buffer() {
 }
 
 bool Demo::eof() {
-  stream.peek();
-  return stream.eof();
+  return stream.peek() == EOF;
 }
 
 size_t Demo::get_buffer_len() {
   return buffer_len;
 }
+
+#include <iostream>
 
 EDemoCommands Demo::get_message_type(int *tick, bool *compressed) {
   uint32_t command = read_var_int(stream);

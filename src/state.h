@@ -12,8 +12,6 @@
 // I'm not strict about these but if someone specially crafted a replay it could probably
 // do some damage.
 #define MAX_ENTITIES 0x3FFF
-#define MAX_KEY_SIZE 0x400
-#define MAX_MESSAGE_SIZE 0x4000
 #define MAX_SEND_TABLES 0xFFFF
 #define MAX_NONDATATABLE_PROPS 0x800
 
@@ -125,8 +123,9 @@ public:
   DTProp dt_prop;
 };
 
-enum StringTableFlag {
-  STF_FixedLength = 8,
+enum ST_Flags {
+  ST_Something = 2,
+  ST_FixedLength = 8,
 };
 
 class StringTableEntry {

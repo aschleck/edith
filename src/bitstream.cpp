@@ -20,6 +20,10 @@ bool Bitstream::eof() const {
   return position >= end;
 }
 
+size_t Bitstream::get_end() const {
+  return end;
+}
+
 size_t Bitstream::get_position() const {
   return position;
 }
@@ -48,6 +52,9 @@ uint32_t Bitstream::get_bits(size_t n) {
 }
 
 void Bitstream::read_bits(void *buffer, size_t bit_length) {
+  XASSERT(position + bit_length <= end, "Buffer will overflow: %d + %d > %d", position,
+      bit_length, end);
+
   size_t remaining = bit_length;
 
   size_t i = 0;

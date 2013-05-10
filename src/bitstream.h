@@ -12,6 +12,7 @@ class Bitstream {
 
     bool eof() const;
 
+    size_t get_end() const;
     size_t get_position() const;
     void set_position(size_t new_position);
 

@@ -11,11 +11,11 @@ uint32_t read_int(Bitstream &stream, const SendProp *prop) {
       return stream.read_var_35();
     } else {
       uint32_t value = stream.read_var_35();
-      return -(value & 1) ^ (value >> 1);
+      return (-(value & 1)) ^ (value >> 1);
     }
   } else {
     uint32_t value = stream.get_bits(prop->num_bits);
-    uint32_t signer = (0x80000000 >> prop->num_bits) & ((prop->flags & SP_Unsigned) - 1);
+    uint32_t signer = (0x80000000 >> (32 - prop->num_bits)) & ((prop->flags & SP_Unsigned) - 1);
 
     value = value ^ signer;
     return value - signer;
