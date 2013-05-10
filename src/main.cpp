@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include <iostream>
 
-#include "generated_proto/demo.pb.h"
-#include "generated_proto/netmessages.pb.h"
+#include "demo.pb.h"
+#include "netmessages.pb.h"
 
 #include "bitstream.h"
 #include "debug.h"
@@ -10,6 +10,7 @@
 #include "demo.h"
 #include "entity.h"
 #include "state.h"
+#include "noisy_visitor.h"
 
 #define INSTANCE_BASELINE_TABLE "instancebaseline"
 #define MAX_EDICTS 0x800
@@ -23,6 +24,8 @@ enum UpdateFlag {
 };
 
 State *state = 0;
+
+Visitor *visitor = new NoisyVisitor();
 
 uint32_t read_var_int(const char *data, size_t length, size_t *offset) {
   uint32_t b;
@@ -83,8 +86,6 @@ void dump_DEM_SendTables(const CDemoSendTables &tables) {
 
     offset += size;
   }
-
-  printf("Done with SendTables.\n");
 }
 
 const StringTableEntry &get_baseline_for(int class_i) {
@@ -136,6 +137,11 @@ void read_entity_enter_pvs(uint32_t entity_id, Bitstream &stream) {
   const FlatSendTable &flat_send_table = state->flat_send_tables[clazz.dt_name];
 
   Entity &entity = state->entities[entity_id];
+
+  if (entity.id != -1) {
+    visitor->visit_entity_deleted(entity);
+  }
+
   entity = Entity(entity_id, clazz, flat_send_table);
 
   const StringTableEntry &baseline = get_baseline_for(class_i);
@@ -144,7 +150,7 @@ void read_entity_enter_pvs(uint32_t entity_id, Bitstream &stream) {
 
   entity.update(stream);
 
-  //std::cout << "Created a " << clazz.name << " (id=" << entity_id << ", serial=" << serial << ")" << std::endl;
+  visitor->visit_entity_created(entity);
 }
 
 void read_entity_update(uint32_t entity_id, Bitstream &stream) {
@@ -155,17 +161,16 @@ void read_entity_update(uint32_t entity_id, Bitstream &stream) {
 
   entity.update(stream);
 
-  //std::cout << "Updated a " << entity.table->net_table_name << std::endl;
+  visitor->visit_entity_updated(entity);
 }
 
 void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
-  static size_t num = 0;
-  if (++num == 1) {
+  // Seem to get the first packet twice.
+  static bool first = true;
+  if (first) {
+    first = false;
     return;
   }
-
-  //printf("pe is_delta? %d update_baseline? %d baseline? %d delta_from? %d updated_entries? %d size? %ld\n", entities.is_delta(),
-  //    entities.update_baseline(), entities.baseline(), entities.delta_from(), entities.updated_entries(), entities.entity_data().length());
 
   Bitstream stream(entities.entity_data());
 
@@ -176,17 +181,14 @@ void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
   while (found < entities.updated_entries()) {
     update_type = read_entity_header(&entity_id, stream);
 
-    //printf("Got %d %d.\n", entity_id, update_type);
-
     if (update_type & UF_EnterPVS) {
       read_entity_enter_pvs(entity_id, stream);
     } else if (update_type & UF_LeavePVS) {
       XASSERT(entities.is_delta(), "Leave PVS on full update");
 
-      std::cout << "Leave PVS?" << std::endl;
-
       if (update_type & UF_Delete) {
-        std::cout << "Deleting entity " << entity_id << std::endl;
+        visitor->visit_entity_deleted(state->entities[entity_id]);
+
         state->entities[entity_id].id = -1;
       }
     } else {
@@ -196,10 +198,11 @@ void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
     ++found;
   }
 
-  std::cout << "Remaining: " << stream.get_end() - stream.get_position() << std::endl;
   if (entities.is_delta()) {
     while (stream.get_bits(1)) {
-      std::cout << "Delete " << stream.get_bits(11) << std::endl;
+      entity_id = stream.get_bits(11);
+      visitor->visit_entity_deleted(state->entities[entity_id]);
+      state->entities[entity_id].id = -1;
     }
   }
 }
@@ -235,17 +238,9 @@ void dump_DEM_ClassInfo(const CDemoClassInfo &info) {
 }
 
 void update_string_table(StringTable &table, size_t num_entries, std::string data) {
-  if (table.flags & ST_Something) {
-    std::cout << "ST_Something table " << table.name << " was skipped" << std::endl;
-    return;
-  }
-
   Bitstream stream(data);
 
   uint32_t first = stream.get_bits(1);
-
-  std::cout << table.name << std::endl;
-  std::cout << table.flags << std::endl;
 
   uint32_t entry_id = -1;
   size_t entries_read = 0;
@@ -265,10 +260,14 @@ void update_string_table(StringTable &table, size_t num_entries, std::string dat
         XERROR("please no");
       } else {
         if (stream.get_bits(1)) {
+          XERROR("no substring");
+
+          // this copies a substring of a previous string we read
+          // not implemented
           uint32_t a = stream.get_bits(5);
           uint32_t b = stream.get_bits(5) + 1;
 
-          std::cout << "Copying " << b << " of " << a << std::endl;
+          //std::cout << "Copying " << b << " of " << a << std::endl;
 
           // copy bits and then append:
           stream.read_string(key_buffer, MAX_KEY_SIZE);
@@ -342,7 +341,12 @@ void handle_SVC_UpdateStringTable(const CSVCMsg_UpdateStringTable &update) {
 
 void clear_entities() {
   for (size_t i = 0; i < MAX_ENTITIES; ++i) {
-    state->entities[i].id = -1;
+    Entity &entity = state->entities[i];
+
+    if (entity.id != -1) {
+      visitor->visit_entity_deleted(entity);
+      entity.id = -1;
+    }
   }
 }
 
@@ -396,7 +400,7 @@ void dump(const char *file) {
     EDemoCommands command = demo.get_message_type(&tick, &compressed);
     demo.read_message(compressed, &size, &uncompressed_size);
 
-    std::cout << "Tick " << tick << std::endl;
+    visitor->visit_tick(tick);
 
     if (command == DEM_ClassInfo) {
       CDemoClassInfo info;
@@ -420,7 +424,7 @@ void dump(const char *file) {
 
       dump_DEM_Packet(packet);
     } else {
-      printf("Skipped command %u %lu (%lu) bytes.\n", command, size, uncompressed_size);
+      //printf("Skipped command %u %lu (%lu) bytes.\n", command, size, uncompressed_size);
     }
   }
 }

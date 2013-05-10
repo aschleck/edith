@@ -5,7 +5,7 @@
 
 #include <fstream>
 
-#include "generated_proto/demo.pb.h"
+#include "demo.pb.h"
 
 #define DEMO_BUFFER_SIZE (512 * 1024)
 
