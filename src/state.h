@@ -64,12 +64,6 @@ public:
       const std::string &dt_name, uint32_t num_elements, float low_value, float high_value,
       uint32_t num_bits);
 
-  SendProp(const SendProp &that);
-  SendProp(SendProp &&that);
-  SendProp &operator=(SendProp that);
-
-  friend void swap(SendProp &first, SendProp &second);
-
   SP_Types type;
   std::string var_name;
   uint32_t flags;

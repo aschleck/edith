@@ -43,44 +43,6 @@ SendProp::SendProp(SP_Types _type, const std::string &_var_name, uint32_t _flags
   array_prop(0) {
 }
 
-SendProp::SendProp(const SendProp &that) {
-  type = that.type;
-  var_name = that.var_name;
-  flags = that.flags;
-  priority = that.priority;
-  dt_name = that.dt_name;
-  num_elements = that.num_elements;
-  low_value = that.low_value;
-  high_value = that.high_value;
-  num_bits = that.num_bits;
-  array_prop = that.array_prop;
-}
-
-SendProp::SendProp(SendProp &&that) {
-  swap(*this, that);
-}
-
-SendProp &SendProp::operator=(SendProp that) {
-  swap(*this, that);
-
-  return *this;
-}
-
-void swap(SendProp &first, SendProp &second) {
-  using std::swap;
-
-  swap(first.type, second.type);
-  swap(first.var_name, second.var_name);
-  swap(first.flags, second.flags);
-  swap(first.priority, second.priority);
-  swap(first.dt_name, second.dt_name);
-  swap(first.num_elements, second.num_elements);
-  swap(first.low_value, second.low_value);
-  swap(first.high_value, second.high_value);
-  swap(first.num_bits, second.num_bits);
-  swap(first.array_prop, second.array_prop);
-}
-
 SendTable::SendTable() {
 }
 
