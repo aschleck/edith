@@ -57,6 +57,8 @@ enum SP_Types {
   SP_Int64 = 7,
 };
 
+class SendTable;
+
 class SendProp {
 public:
   SendProp();
@@ -76,6 +78,7 @@ public:
   float high_value;
   uint32_t num_bits;
 
+  SendTable *in_table;
   SendProp *array_prop;
 };
 

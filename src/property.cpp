@@ -345,32 +345,34 @@ uint64_t read_int64(Bitstream &stream, const SendProp *prop) {
 std::shared_ptr<Property> Property::read_prop(Bitstream &stream, const SendProp *prop) {
   Property *out;
 
+  std::string var_name = prop->in_table->net_table_name + "." + prop->var_name;
+
   if (prop->type == SP_Int) {
-    out = new IntProperty(prop->var_name, read_int(stream, prop));
+    out = new IntProperty(var_name, read_int(stream, prop));
   } else if (prop->type == SP_Float) {
-    out = new FloatProperty(prop->var_name, read_float(stream, prop));
+    out = new FloatProperty(var_name, read_float(stream, prop));
   } else if (prop->type == SP_Vector) {
     float value[3];
     read_vector(value, stream, prop);
 
-    out = new VectorProperty(prop->var_name, value);
+    out = new VectorProperty(var_name, value);
   } else if (prop->type == SP_VectorXY) {
     float value[2];
     read_vector_xy(value, stream, prop);
 
-    out = new VectorXYProperty(prop->var_name, value);
+    out = new VectorXYProperty(var_name, value);
   } else if (prop->type == SP_String) {
     char str[MAX_STRING_LENGTH + 1];
     size_t length = read_string(str, MAX_STRING_LENGTH, stream, prop);
 
-    out = new StringProperty(prop->var_name, std::string(str, length));
+    out = new StringProperty(var_name, std::string(str, length));
   } else if (prop->type == SP_Array) {
     std::vector<ArrayPropertyElement> elements;
     read_array(elements, stream, prop);
 
-    out = new ArrayProperty(prop->var_name, elements, prop->array_prop->type);
+    out = new ArrayProperty(var_name, elements, prop->array_prop->type);
   } else if (prop->type == SP_Int64) {
-    out = new Int64Property(prop->var_name, read_int64(stream, prop));
+    out = new Int64Property(var_name, read_int64(stream, prop));
   } else {
     XERROR("Unknown send prop type %d", prop->type);
   }

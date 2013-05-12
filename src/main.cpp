@@ -6,11 +6,10 @@
 
 #include "bitstream.h"
 #include "debug.h"
-#include "decoder.h"
 #include "demo.h"
 #include "entity.h"
 #include "state.h"
-#include "noisy_visitor.h"
+#include "death_recording_visitor.h"
 
 #define INSTANCE_BASELINE_TABLE "instancebaseline"
 #define MAX_EDICTS 0x800
@@ -24,8 +23,7 @@ enum UpdateFlag {
 };
 
 State *state = 0;
-
-Visitor *visitor = new NoisyVisitor();
+Visitor *visitor = new DeathRecordingVisitor();
 
 uint32_t read_var_int(const char *data, size_t length, size_t *offset) {
   uint32_t b;
@@ -227,6 +225,8 @@ void dump_DEM_ClassInfo(const CDemoClassInfo &info) {
     for (size_t i = 0; i < table.props.size(); ++i) {
       SendProp &prop = table.props[i];
 
+      prop.in_table = &table;
+
       if (prop.type == SP_Array) {
         XASSERT(i > 0, "Array prop %s is at index zero.", prop.var_name.c_str());
         prop.array_prop = &(table.props[i - 1]);
@@ -380,8 +380,6 @@ void dump_DEM_Packet(const CDemoPacket &packet) {
       table.ParseFromArray(&(data[offset]), size);
 
       handle_SVC_UpdateStringTable(table);
-    } else {
-      //printf("Skipped command %u with %u bytes.\n", command, size);
     }
 
     offset += size;
@@ -423,8 +421,6 @@ void dump(const char *file) {
       packet.ParseFromArray(demo.expose_buffer(), uncompressed_size);
 
       dump_DEM_Packet(packet);
-    } else {
-      //printf("Skipped command %u %lu (%lu) bytes.\n", command, size, uncompressed_size);
     }
   }
 }
