@@ -1,6 +1,7 @@
 edith
 =====
 edith@exclusivelyducks.com
+
 http://github.com/dschleck/edith
 
 A Dota 2 replay (.dem) parser that understands packet entities. Tested on OS X.
@@ -41,8 +42,8 @@ like the following that I wanted to synchronize:
       int y;
     };
 
-Then there would be a send prop named *x* with type 1 (float) and a send prop named *y*
-with type 0 (int) in a send table named *Ent*.
+Then there would be a send prop named **x** with type 1 (float) and a send prop named **y**
+with type 0 (int) in a send table named **Ent**.
 
 Beyond simply adding additional types (strings, int64s, arrays) send props can also
 point at other send tables whose props you want to include in this send table. The
@@ -50,46 +51,47 @@ primary use of this is for inheritance, most send tables have a send prop named
 "baseclass" that points at the send table of the parent class.
 
 The other big source of complexity comes from exclude props. If I had some class that
-inherited from *Ent* but I don't care about *Ent.y* and don't want it to be
-synchronized I can use an exclude prop. The name of this prop would be *y* and it
-would also have a field called datatable name set to *Ent*.
+inherited from **Ent** but I don't care about **Ent.y** and don't want it to be
+synchronized I can use an exclude prop. The name of this prop would be **y** and it
+would also have a field called datatable name set to **Ent**.
 
 After we read in all of the send tables and send props from the replay we have to flatten
 them. This means that instead of having a send prop in our send table that points at the
-*DT_DOTA_Unit_Hero_Windrunner* send table, we just copy all of the props in the
-*DT_DOTA_Unit_Hero_Windrunner* send table into ours.
+**DT_DOTA_Unit_Hero_Windrunner** send table, we just copy all of the props in the
+**DT_DOTA_Unit_Hero_Windrunner** send table into ours.
 
-Now that we have our flattened send tables we need to tackle the *instancebaseline*
+Now that we have our flattened send tables we need to tackle the **instancebaseline**
 string table. Suppose you have a class with two hundred integers and every instance
 sets those to zero. Rather than transferring two hundred zeroes every time you need to
 create a new instance of this class, it would be better to have a default instance of
 the class and then transfer only what is not in the default when you create a new
-instance. The *instancebaseline* table has an entry for every class with such a default.
+instance. The **instancebaseline** table has an entry for every class with such a default.
 
 Finally we can parse our packet entities. When the server thinks an entity enters the
 client's potentially visible set (PVS) it tells the client to make a new entity. Making
-a new entity requires first parsing the entry in *instancebaseline* and then parsing
+a new entity requires first parsing the entry in **instancebaseline** and then parsing
 the data sent in the packet. Parsing both of these is exactly the same, first you read
 the list of properties that they contain and then you read each property.
 
 When an entity is updated you do exactly the same procedure but don't bother with
-*instancebaseline*. For deleting entities you only need to read entity ID.
+**instancebaseline**. For deleting entities you only need to read entity ID.
 
 Understanding my code:
 ----------------------
-*death_recording_visitor* is an example of doing something useful with my code. This
+**death_recording_visitor** is an example of doing something useful with my code. This
 outputs a line whenever an entity is updated and is also dead (which is way more times
-than actual deaths).
+than actual deaths). This was used to gather data for the tool that produced the image
+above.
 
-*entity* describes an entity and stores its properties.
+**entity** describes an entity and stores its properties.
 
-*property* handles the different types of send props and stores the correct data for
+**property** handles the different types of send props and stores the correct data for
 each one.
 
-*state* contains a bunch of data structures read from the replay and handles flattening
+**state** contains a bunch of data structures read from the replay and handles flattening
 send tables.
 
-*main* reads the replay, converts it into the internal representation used by the program,
+**main** reads the replay, converts it into the internal representation used by the program,
 and runs the logic for everything but flattening send tables.
 
 Limitations:
