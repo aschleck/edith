@@ -5,7 +5,7 @@ http://github.com/dschleck/edith
 
 A Dota 2 replay (.dem) parser that understands packet entities. Tested on OS X.
 
-(sl2-navi-mouz-g1-kills.png)
+![Kills in SL2 Na`Vi v Mouz game 1](sl2-navi-mouz-g1-kills.png)
 
 Quick start:
 ------------
