@@ -20,8 +20,8 @@ std::vector<std::string> player_names;
 std::map<uint32_t, uint32_t> selected_hero_id;
 
 // This handles the CDOTA_PlayerResource entitiy.
-// We want the 23 send props from the m_iszPlayerNames table named 0000-0023
-// that contain the names of the (up to) 24 people connected and we want the 23
+// We want the 24 send props from the m_iszPlayerNames table named 0000-0023
+// that contain the names of the (up to) 24 people connected and we want the 24
 // send props from m_hSelectedHero that contain the entity ID of the heroes they
 // selected.
 void update_name_map(const Entity &player_resource) {
