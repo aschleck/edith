@@ -4,7 +4,7 @@ edith@exclusivelyducks.com
 
 http://github.com/dschleck/edith
 
-A Dota 2 replay (.dem) parser that understands packet entities. Tested on OS X.
+A Dota 2 replay (.dem) parser that understands packet entities. Tested on OS X and Ubuntu.
 
 ![Kills in SL2 Na`Vi v Mouz game 1](sl2-navi-mouz-g1-kills.png)
 
@@ -96,8 +96,6 @@ and runs the logic for everything but flattening send tables.
 
 Limitations:
 ------------
-I doubt this actually compiles on anything but OS X.
-
 This seems to work on the replays that I have tried, however there are probably a
 million different bugs hiding. I'm particularily scared of a lot of the float
 deserializations.
