@@ -1,5 +1,6 @@
 #include "state.h"
 
+#include <algorithm>
 #include <iomanip>
 #include <iostream>
 
@@ -75,7 +76,7 @@ StringTable::StringTable(const std::string &_name, uint32_t _max_entries,
   user_data_size(_user_data_size),
   user_data_size_bits(_user_data_size_bits),
   flags(_flags),
-  entry_bits(log2(_max_entries)) {
+  entry_bits(log2((size_t) _max_entries)) {
 }
 
 bool StringTable::contains(const std::string &key) const {
@@ -103,7 +104,7 @@ StringTableEntry &StringTable::put(const std::string &key, const std::string &va
 
 State::State(uint32_t _max_classes) :
     max_classes(_max_classes),
-    class_bits(log2(_max_classes)),
+    class_bits(log2((size_t) _max_classes)),
     entities(new Entity[MAX_ENTITIES]()) {
 }
 
