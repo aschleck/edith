@@ -15,6 +15,10 @@ Quick start:
     make
     ./edith <a replay>
 
+Ubuntu Build:
+-------------
+	cmake -DPROTOBUF_IMPORT_DIRS=/usr/include -DCMAKE_CXX_FLAGS='-std=gnu++0x -mmmx -msse2' ../src
+
 If make can't generate the protocol buffers then you may need to find the directory
 containing google/protobuf/descriptor.proto and do:
 
