@@ -47,7 +47,7 @@ void update_name_map(const Entity &player_resource) {
 
       // Valve packs some additional data in the upper bits, we only care about the lower
       // ones.
-      selected_hero_id[selected->value & 0x3FF] = selected_hero_count;
+      selected_hero_id[selected->value & 0x7FF] = selected_hero_count;
 
       ++selected_hero_count;
     }

@@ -26,8 +26,8 @@ float read_float_coord(Bitstream &stream) {
   uint32_t first = stream.get_bits(1);
   uint32_t second = stream.get_bits(1);
 
-  __m128 a = _mm_setzero_si128();
-  __m128 b = _mm_setzero_si128();
+  __m128 a = (__m128)_mm_setzero_si128();
+  __m128 b = (__m128)_mm_setzero_si128();
 
   if (first || second) {
     uint32_t third = stream.get_bits(1);
@@ -40,20 +40,20 @@ float read_float_coord(Bitstream &stream) {
       second = stream.get_bits(5);
     }
 
-    b = _mm_cvtsi32_si128(first);
+    b = (__m128)_mm_cvtsi32_si128(first);
     a = _mm_cvtsi32_ss(a, second);
 
-    __m128 special = _mm_setr_epi32(0x3D000000, 0, 0, 0);
+    __m128 special = (__m128)_mm_setr_epi32(0x3D000000, 0, 0, 0);
     a = _mm_mul_ss(a, special);
-    a = _mm_cvtps_pd(a);
+    a = (__m128)_mm_cvtps_pd(a);
 
-    b = _mm_cvtepi32_pd(b);
+    b = (__m128)_mm_cvtepi32_pd((__m128i)b);
     
-    a = _mm_add_sd(a, b);
-    a = _mm_cvtpd_ps(a);
+    a = (__m128)_mm_add_sd((__m128d)a, (__m128d)b);
+    a = (__m128)_mm_cvtpd_ps((__m128d)a);
 
     if (third) {
-      __m128 mask = _mm_set1_epi32(0x80000000);
+      __m128 mask = (__m128)_mm_set1_epi32(0x80000000);
       a = _mm_xor_ps(a, mask);
     }
   }
@@ -105,7 +105,7 @@ float read_float_coord_mp(Bitstream &stream, FloatType type) {
     XERROR("Unknown coord type.");
   }
 
-  __m128 a = _mm_setzero_si128();
+  __m128 a = (__m128)_mm_setzero_si128();
   a = _mm_cvtsi32_ss(a, value);
   float f;
   _mm_store_ss(&f, a);
@@ -116,7 +116,7 @@ float read_float_coord_mp(Bitstream &stream, FloatType type) {
 float read_float_no_scale(Bitstream &stream) {
   uint32_t value = stream.get_bits(32);
 
-  __m128 a = _mm_setzero_si128();
+  __m128 a = (__m128)_mm_setzero_si128();
   a = _mm_cvtsi32_ss(a, value);
   float f;
   _mm_store_ss(&f, a);
@@ -137,7 +137,7 @@ float read_float_normal(Bitstream &stream) {
   f *= 4.885197850512946e-4;
 
   __m128 a = _mm_load_ss(&f);
-  __m128 mask = _mm_set_epi32(0x80000000, 0x80000000, 0x80000000, 0x80000000);
+  __m128 mask = (__m128)_mm_set_epi32(0x80000000, 0x80000000, 0x80000000, 0x80000000);
   a = _mm_xor_ps(a, mask);
 
   _mm_store_ss(&f, a);
@@ -160,28 +160,28 @@ float read_float_cell_coord(Bitstream &stream, FloatType type, uint32_t bits) {
 
     __m128 a;
     if (!lp) {
-      a = _mm_setr_epi32(0x3FA00000, 0, 0, 0);
+      a = (__m128)_mm_setr_epi32(0x3FA00000, 0, 0, 0);
     } else {
-      a = _mm_setr_epi32(0x3FC00000, 0, 0, 0);
+      a = (__m128)_mm_setr_epi32(0x3FC00000, 0, 0, 0);
     }
 
-    __m128 b = _mm_setzero_si128();
+    __m128 b = (__m128)_mm_setzero_si128();
     b = _mm_cvtsi32_ss(b, second);
-    b = _mm_cvtps_pd(b);
-    b = _mm_mul_sd(b, a);
+    b = (__m128)_mm_cvtps_pd(b);
+    b = (__m128)_mm_mul_sd((__m128d)b, (__m128d)a);
     
-    a = _mm_setzero_si128();
+    a = (__m128)_mm_setzero_si128();
     a = _mm_cvtsi32_ss(a, value);
     
-    b = _mm_add_sd(b, a);
-    a = _mm_cvtpd_ps(b);
+    b = (__m128)_mm_add_sd((__m128d)b, (__m128d)a);
+    a = (__m128)_mm_cvtpd_ps((__m128d)b);
 
     float f;
     _mm_store_ss(&f, a);
 
     return f;
   } else if (type == FT_Integral) {
-    __m128 a = _mm_setzero_si128();
+    __m128 a = (__m128)_mm_setzero_si128();
     a = _mm_cvtsi32_ss(a, value);
     float f;
     _mm_store_ss(&f, a);
@@ -218,10 +218,10 @@ float read_float(Bitstream &stream, const SendProp *prop) {
     return read_float_cell_coord(stream, FT_Integral, prop->num_bits);
   } else {
     unsigned int value = stream.get_bits(prop->num_bits);
-    __m128 a = _mm_setzero_si128();
+    __m128 a = (__m128)_mm_setzero_si128();
     a = _mm_cvtsi32_ss(a, value);
 
-    __m128 b = _mm_setzero_si128();
+    __m128 b = (__m128)_mm_setzero_si128();
     b = _mm_cvtsi32_ss(b, (1 << prop->num_bits) - 1);
 
     a = _mm_div_ss(a, b);
@@ -256,17 +256,17 @@ void read_vector(float vector[3], Bitstream &stream, const SendProp *prop) {
 
     a = _mm_add_ss(a, b);
 
-    b = _mm_setr_epi32(0x3D000000, 0, 0, 0);
+    b = (__m128)_mm_setr_epi32(0x3D000000, 0, 0, 0);
 
     if (_mm_comile_ss(b, a)) {
-      a = _mm_setzero_si128();
+      a = (__m128)_mm_setzero_si128();
     } else {
       b = _mm_sub_ss(b, a);
       a = _mm_sqrt_ss(b);
     }
 
     if (first) {
-      __m128 special = _mm_setr_epi32(0x3D000000, 0, 0, 0);
+      __m128 special = (__m128)_mm_setr_epi32(0x3D000000, 0, 0, 0);
       a = _mm_mul_ss(a, special);
     }
 
