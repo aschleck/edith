@@ -1,7 +1,6 @@
 #include "property.h"
 
-#include <iostream>
-#include <xmmintrin.h>
+#include <cmath>
 
 #define MAX_STRING_LENGTH 0x200
 
@@ -23,44 +22,31 @@ uint32_t read_int(Bitstream &stream, const SendProp *prop) {
 }
 
 float read_float_coord(Bitstream &stream) {
-  uint32_t first = stream.get_bits(1);
-  uint32_t second = stream.get_bits(1);
+  uint32_t integer = stream.get_bits(1);
+  uint32_t fraction = stream.get_bits(1);
 
-  __m128 a = (__m128)_mm_setzero_si128();
-  __m128 b = (__m128)_mm_setzero_si128();
+  if (integer || fraction) {
+    uint32_t sign = stream.get_bits(1);
 
-  if (first || second) {
-    uint32_t third = stream.get_bits(1);
-
-    if (first) {
-      first = stream.get_bits(0x0E) + 1;
+    if (integer) {
+      integer = stream.get_bits(0x0E) + 1;
     }
 
-    if (second) {
-      second = stream.get_bits(5);
+    if (fraction) {
+      fraction = stream.get_bits(5);
     }
 
-    b = (__m128)_mm_cvtsi32_si128(first);
-    a = _mm_cvtsi32_ss(a, second);
+    double d = 0.03125 * fraction;
+    d += integer;
 
-    __m128 special = (__m128)_mm_setr_epi32(0x3D000000, 0, 0, 0);
-    a = _mm_mul_ss(a, special);
-    a = (__m128)_mm_cvtps_pd(a);
-
-    b = (__m128)_mm_cvtepi32_pd((__m128i)b);
-    
-    a = (__m128)_mm_add_sd((__m128d)a, (__m128d)b);
-    a = (__m128)_mm_cvtpd_ps((__m128d)a);
-
-    if (third) {
-      __m128 mask = (__m128)_mm_set1_epi32(0x80000000);
-      a = _mm_xor_ps(a, mask);
+    if (sign) {
+      d *= -1;
     }
+
+    return (float) d;
+  } else {
+    return 0;
   }
-
-  float f;
-  _mm_store_ss(&f, a);
-  return f;
 }
 
 enum FloatType {
@@ -80,7 +66,6 @@ float read_float_coord_mp(Bitstream &stream, FloatType type) {
     value = 4 * c + 2 * b + a;
 
     XERROR("please no");
-
   } else if (type == FT_Integral) {
     uint32_t a = stream.get_bits(1);
     uint32_t b = stream.get_bits(1);
@@ -100,47 +85,33 @@ float read_float_coord_mp(Bitstream &stream, FloatType type) {
       } else {
         value = (value >> 1) + 1;
       }
+
+      return value;
     }
   } else {
     XERROR("Unknown coord type.");
   }
-
-  __m128 a = (__m128)_mm_setzero_si128();
-  a = _mm_cvtsi32_ss(a, value);
-  float f;
-  _mm_store_ss(&f, a);
-
-  return f;
 }
 
 float read_float_no_scale(Bitstream &stream) {
-  uint32_t value = stream.get_bits(32);
-
-  __m128 a = (__m128)_mm_setzero_si128();
-  a = _mm_cvtsi32_ss(a, value);
-  float f;
-  _mm_store_ss(&f, a);
-
-  return f;
+  return stream.get_bits(32);
 }
 
 float read_float_normal(Bitstream &stream) {
-  uint32_t first = stream.get_bits(1);
-  uint32_t second = stream.get_bits(11);
+  uint32_t sign = stream.get_bits(1);
+  uint32_t value = stream.get_bits(11);
 
-  float f = second;
+  float f = value;
 
-  if (second >> 31) {
+  if (value >> 31) {
     f += 4.2949673e9;
   }
 
   f *= 4.885197850512946e-4;
 
-  __m128 a = _mm_load_ss(&f);
-  __m128 mask = (__m128)_mm_set_epi32(0x80000000, 0x80000000, 0x80000000, 0x80000000);
-  a = _mm_xor_ps(a, mask);
-
-  _mm_store_ss(&f, a);
+  if (sign) {
+    f = -1 * f;
+  }
 
   return f;
 }
@@ -149,48 +120,25 @@ float read_float_cell_coord(Bitstream &stream, FloatType type, uint32_t bits) {
   uint32_t value = stream.get_bits(bits);
 
   if (type == FT_None || type == FT_LowPrecision) {
-    bool lp = type  == FT_LowPrecision;
+    bool lp = type == FT_LowPrecision;
 
-    uint32_t second;
+    uint32_t fraction;
     if (!lp) {
-      second = stream.get_bits(5);
+      fraction = stream.get_bits(5);
     } else {
-      second = stream.get_bits(3);
+      fraction = stream.get_bits(3);
     }
 
-    __m128 a;
-    if (!lp) {
-      a = (__m128)_mm_setr_epi32(0x3FA00000, 0, 0, 0);
-    } else {
-      a = (__m128)_mm_setr_epi32(0x3FC00000, 0, 0, 0);
-    }
-
-    __m128 b = (__m128)_mm_setzero_si128();
-    b = _mm_cvtsi32_ss(b, second);
-    b = (__m128)_mm_cvtps_pd(b);
-    b = (__m128)_mm_mul_sd((__m128d)b, (__m128d)a);
-    
-    a = (__m128)_mm_setzero_si128();
-    a = _mm_cvtsi32_ss(a, value);
-    
-    b = (__m128)_mm_add_sd((__m128d)b, (__m128d)a);
-    a = (__m128)_mm_cvtpd_ps((__m128d)b);
-
-    float f;
-    _mm_store_ss(&f, a);
-
-    return f;
+    double d = value + (lp ? 1.5 : 1.25) * fraction;
+    return (float) d;
   } else if (type == FT_Integral) {
-    __m128 a = (__m128)_mm_setzero_si128();
-    a = _mm_cvtsi32_ss(a, value);
-    float f;
-    _mm_store_ss(&f, a);
+    double d = value;
 
     if (value >> 31) {
-      f += 4.2949673e9;
+      d += 4.2949673e9;
     } 
 
-    return f;
+    return (float) d;
   } else {
     XERROR("Unknown float type");
     return 0;
@@ -217,27 +165,13 @@ float read_float(Bitstream &stream, const SendProp *prop) {
   } else if (prop->flags & SP_CellCoordIntegral) {
     return read_float_cell_coord(stream, FT_Integral, prop->num_bits);
   } else {
-    unsigned int value = stream.get_bits(prop->num_bits);
-    __m128 a = (__m128)_mm_setzero_si128();
-    a = _mm_cvtsi32_ss(a, value);
+    uint32_t dividend = stream.get_bits(prop->num_bits);
+    uint32_t divisor = (1 << prop->num_bits) - 1;
 
-    __m128 b = (__m128)_mm_setzero_si128();
-    b = _mm_cvtsi32_ss(b, (1 << prop->num_bits) - 1);
-
-    a = _mm_div_ss(a, b);
-
+    float f = ((float) dividend) / divisor;
     float range = prop->high_value - prop->low_value;
-    b = _mm_load_ss(&range);
-    a = _mm_mul_ss(a, b);
 
-    range = prop->low_value;
-    b = _mm_load_ss(&range);
-    a = _mm_add_ss(a, b);
-
-    float f;
-    _mm_store_ss(&f, a);
-
-    return f;
+    return f * range + prop->low_value;
   }
 }
 
@@ -246,31 +180,19 @@ void read_vector(float vector[3], Bitstream &stream, const SendProp *prop) {
   vector[1] = read_float(stream, prop);
 
   if (prop->flags & SP_Normal) {
-    uint32_t first = stream.get_bits(1);
+    uint32_t sign = stream.get_bits(1);
 
-    __m128 a = _mm_load_ss(&vector[0]);
-    __m128 b = _mm_load_ss(&vector[1]);
+    float f = vector[0] * vector[0] + vector[1] * vector[1];
 
-    a = _mm_mul_ss(a, a);
-    b = _mm_mul_ss(b, b);
-
-    a = _mm_add_ss(a, b);
-
-    b = (__m128)_mm_setr_epi32(0x3D000000, 0, 0, 0);
-
-    if (_mm_comile_ss(b, a)) {
-      a = (__m128)_mm_setzero_si128();
+    if (1 >= f) {
+      vector[2] = 0;
     } else {
-      b = _mm_sub_ss(b, a);
-      a = _mm_sqrt_ss(b);
+      vector[2] = sqrt(1 - f);
     }
 
-    if (first) {
-      __m128 special = (__m128)_mm_setr_epi32(0x3D000000, 0, 0, 0);
-      a = _mm_mul_ss(a, special);
+    if (sign) {
+      vector[2] = -1 * vector[2];
     }
-
-    _mm_store_ss(&vector[2], a);
   } else {
     vector[2] = read_float(stream, prop);
   }
