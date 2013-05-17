@@ -129,7 +129,7 @@ float read_float_cell_coord(Bitstream &stream, FloatType type, uint32_t bits) {
       fraction = stream.get_bits(3);
     }
 
-    double d = value + (lp ? 1.5 : 1.25) * fraction;
+    double d = value + (lp ? 0.125 : 0.03125) * fraction;
     return (float) d;
   } else if (type == FT_Integral) {
     double d = value;
