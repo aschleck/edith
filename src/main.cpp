@@ -12,6 +12,7 @@
 #include "death_recording_visitor.h"
 
 #define INSTANCE_BASELINE_TABLE "instancebaseline"
+#define KEY_HISTORY_SIZE 32
 #define MAX_EDICTS 0x800
 #define MAX_KEY_SIZE 0x400
 #define MAX_VALUE_SIZE 0x4000
@@ -237,10 +238,37 @@ void dump_DEM_ClassInfo(const CDemoClassInfo &info) {
   state->compile_send_tables();
 }
 
-void update_string_table(StringTable &table, size_t num_entries, std::string data) {
+void read_string_table_key(uint32_t first_bit, Bitstream &stream, char *buf,
+    size_t buf_length, std::vector<std::string> &key_history) {
+  if (first_bit && stream.get_bits(1)) {
+    XERROR("Not sure how to read this key");
+  } else {
+    uint32_t is_substring = stream.get_bits(1);
+
+    if (is_substring) {
+      uint32_t from_index = stream.get_bits(5);
+      uint32_t from_length = stream.get_bits(5);
+      key_history[from_index].copy(buf, from_length, 0);
+
+      stream.read_string(buf + from_length, buf_length - from_length);
+    } else {
+      stream.read_string(buf, buf_length);
+    }
+  }
+}
+
+void update_string_table(StringTable &table, size_t num_entries, const std::string &data) {
+  // These do something with precaches. This isn't a client so I'm assuming this
+  // is irrelevant.
+  if (table.flags & 2) {
+    return;
+  }
+
   Bitstream stream(data);
 
-  uint32_t first = stream.get_bits(1);
+  uint32_t first_bit = stream.get_bits(1);
+
+  std::vector<std::string> key_history;
 
   uint32_t entry_id = -1;
   size_t entries_read = 0;
@@ -256,31 +284,22 @@ void update_string_table(StringTable &table, size_t num_entries, std::string dat
     char key_buffer[MAX_KEY_SIZE];
     char *key = 0;
     if (stream.get_bits(1)) {
-      if (first && stream.get_bits(1)) {
-        XERROR("please no");
-      } else {
-        if (stream.get_bits(1)) {
-          XERROR("no substring");
+      read_string_table_key(first_bit, stream, key_buffer, MAX_KEY_SIZE, key_history);
 
-          // this copies a substring of a previous string we read
-          // not implemented
-          uint32_t a = stream.get_bits(5);
-          uint32_t b = stream.get_bits(5) + 1;
+      key = key_buffer;
 
-          //std::cout << "Copying " << b << " of " << a << std::endl;
-
-          // copy bits and then append:
-          stream.read_string(key_buffer, MAX_KEY_SIZE);
-        } else {
-          stream.read_string(key_buffer, MAX_KEY_SIZE);
-          key = key_buffer;
-        }
+      // So technically we should only store the first 32 characters but I'm lazy.
+      if (key_history.size() == KEY_HISTORY_SIZE) {
+        key_history.erase(key_history.begin());
       }
+
+      key_history.push_back(key);
     }
 
     char value_buffer[MAX_VALUE_SIZE];
     char *value = 0;
-    size_t bit_length, length;
+    size_t bit_length = 0;
+    size_t length = 0;
     if (stream.get_bits(1)) {
       if (table.flags & ST_FixedLength) {
         length = table.user_data_size;
@@ -322,10 +341,7 @@ void handle_SVC_CreateStringTable(const CSVCMsg_CreateStringTable &table) {
       (size_t) table.max_entries(), table.flags(), table.user_data_fixed_size(),
       table.user_data_size(), table.user_data_size_bits());
 
-  // I don't want to deal with other string tables right now.
-  if (table.name() == "instancebaseline") {
-    update_string_table(converted, table.num_entries(), table.string_data());
-  }
+  update_string_table(converted, table.num_entries(), table.string_data());
 }
 
 void handle_SVC_UpdateStringTable(const CSVCMsg_UpdateStringTable &update) {
@@ -333,10 +349,7 @@ void handle_SVC_UpdateStringTable(const CSVCMsg_UpdateStringTable &update) {
 
   StringTable &table = state->get_string_table(update.table_id());
 
-  // I don't want to deal with other string tables right now.
-  if (table.name == "instancebaseline") {
-    update_string_table(table, update.num_changed_entries(), update.string_data());
-  }
+  update_string_table(table, update.num_changed_entries(), update.string_data());
 }
 
 void clear_entities() {
