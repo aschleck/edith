@@ -315,6 +315,9 @@ void update_string_table(StringTable &table, size_t num_entries, const std::stri
       }
 
       if (value) {
+        // This is kind of bad because if the server sends us a zero length string we'll consider
+        // it to be uninitialized.
+        XASSERT(item.value.size() == 0, "String table already has this value");
         item.value = std::string(value, length);
       }
     } else {
