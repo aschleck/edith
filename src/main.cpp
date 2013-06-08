@@ -164,13 +164,6 @@ void read_entity_update(uint32_t entity_id, Bitstream &stream) {
 }
 
 void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
-  // Seem to get the first packet twice.
-  static bool first = true;
-  if (first) {
-    first = false;
-    return;
-  }
-
   Bitstream stream(entities.entity_data());
 
   uint32_t entity_id = -1;
@@ -423,12 +416,6 @@ void dump(const char *file) {
       tables.ParseFromArray(demo.expose_buffer(), uncompressed_size);
 
       dump_DEM_SendTables(tables);
-    } else if (command == DEM_FullPacket) {
-      CDemoFullPacket packet;
-      packet.ParseFromArray(demo.expose_buffer(), uncompressed_size);
-
-      clear_entities();
-      dump_DEM_Packet(packet.packet());
     } else if (command == DEM_Packet || command == DEM_SignonPacket) {
       CDemoPacket packet;
       packet.ParseFromArray(demo.expose_buffer(), uncompressed_size);
