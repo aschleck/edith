@@ -11,12 +11,6 @@ Entity::Entity() : id(-1), clazz(0), table(0) {
 
 Entity::Entity(uint32_t _id, const Class &_clazz, const FlatSendTable &_table) :
     id(_id), clazz(&_clazz), table(&_table) {
-  size_t prop_count = table->props.size();
-  properties.reserve(prop_count);
-
-  for (size_t i = 0; i < prop_count; ++i) {
-    properties.push_back(std::shared_ptr<Property>());
-  }
 }
 
 void read_field_number(uint32_t &last_field, Bitstream &stream) {
@@ -49,13 +43,15 @@ void Entity::update(Bitstream &stream) {
   std::vector<uint32_t> fields;
   read_field_list(fields, stream);
 
+  std::string name;
   for (auto iter = fields.begin(); iter != fields.end(); ++iter) {
     uint32_t i = *iter;
 
     //std::cout << table->props[i]->var_name << " " <<
     //  table->props[i]->type << " " <<
     //  table->props[i]->flags << ": ";
-    properties[i] = Property::read_prop(stream, table->props[i]);
+    auto prop = Property::read_prop(stream, table->props[i], name);
+    properties[name] = prop;
   }
 }
 

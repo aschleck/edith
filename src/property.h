@@ -11,20 +11,24 @@
 
 class Property {
 public:
-  static std::shared_ptr<Property> read_prop(Bitstream &stream, const SendProp *prop);
+  static std::shared_ptr<Property> read_prop(Bitstream &stream, const SendProp *prop, std::string& prop_name);
 
-  Property(const std::string &name, SP_Types type);
+  Property(SP_Types type);
   virtual ~Property();
 
-  std::string name;
+  template<typename T>
+  decltype(T::value) value_as() const {
+      return dynamic_cast<const T&>(*this).value;
+  }
+
   SP_Types type;
 };
 
 template<SP_Types SendPropType, typename T>
 class TypedProperty : public Property {
 public:
-  TypedProperty(const std::string &_name, T _value) :
-      Property(_name, SendPropType), value(_value) {
+  TypedProperty(T _value) :
+      Property(SendPropType), value(_value) {
   }
 
   T value;
@@ -33,8 +37,8 @@ public:
 template<SP_Types SendPropType, typename T, size_t C>
 class FixedTypedProperty : public Property {
 public:
-  FixedTypedProperty(const std::string &_name, T _values[C]) :
-      Property(_name, SendPropType) {
+  FixedTypedProperty(T _values[C]) :
+      Property(SendPropType) {
     std::copy(_values, _values + C, values);
   }
 
@@ -46,10 +50,8 @@ typedef std::shared_ptr<Property> ArrayPropertyElement;
 template<>
 class TypedProperty<SP_Array, ArrayPropertyElement> : public Property {
 public:
-  TypedProperty(const std::string &_name, std::vector<ArrayPropertyElement> _elements,
-      SP_Types _value_type) :
-
-      Property(_name, SP_Array),
+  TypedProperty(std::vector<ArrayPropertyElement> _elements, SP_Types _value_type) :
+      Property(SP_Array),
       elements(_elements),
       value_type(_value_type) {
   }
