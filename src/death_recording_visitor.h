@@ -16,7 +16,7 @@
 
 uint32_t tick = 0;
 
-std::vector<std::string> player_names;
+std::array<std::string, 10> player_names;
 std::map<uint32_t, uint32_t> selected_hero_id;
 
 // This handles the CDOTA_PlayerResource entitiy.
@@ -28,33 +28,33 @@ void update_name_map(const Entity &player_resource) {
   using std::dynamic_pointer_cast;
   using std::shared_ptr;
 
-  player_names.clear();
-  selected_hero_id.clear();
-
-  size_t selected_hero_count = 0;
-
-  for (auto iter = player_resource.properties.begin();
-      iter != player_resource.properties.end();
-      ++iter) {
-    shared_ptr<Property> prop = *iter;
-
-    if (prop->name.find("m_iszPlayerNames.") == 0) {
-      shared_ptr<StringProperty> name_prop = dynamic_pointer_cast<StringProperty>(prop);
-
-      player_names.push_back(name_prop->value);
-    } else if (prop->name.find("m_hSelectedHero.") == 0) {
-      shared_ptr<IntProperty> selected = dynamic_pointer_cast<IntProperty>(prop);
-
+  // TODO: go up to 23 (inclusive) if interested in others, like casters.
+  player_names[0] = player_resource.properties.at("m_iszPlayerNames.0000")->value_as<StringProperty>();
+  player_names[1] = player_resource.properties.at("m_iszPlayerNames.0001")->value_as<StringProperty>();
+  player_names[2] = player_resource.properties.at("m_iszPlayerNames.0002")->value_as<StringProperty>();
+  player_names[3] = player_resource.properties.at("m_iszPlayerNames.0003")->value_as<StringProperty>();
+  player_names[4] = player_resource.properties.at("m_iszPlayerNames.0004")->value_as<StringProperty>();
+  player_names[5] = player_resource.properties.at("m_iszPlayerNames.0005")->value_as<StringProperty>();
+  player_names[6] = player_resource.properties.at("m_iszPlayerNames.0006")->value_as<StringProperty>();
+  player_names[7] = player_resource.properties.at("m_iszPlayerNames.0007")->value_as<StringProperty>();
+  player_names[8] = player_resource.properties.at("m_iszPlayerNames.0008")->value_as<StringProperty>();
+  player_names[9] = player_resource.properties.at("m_iszPlayerNames.0009")->value_as<StringProperty>();
       // Valve packs some additional data in the upper bits, we only care about the lower
       // ones.
-      selected_hero_id[selected->value & 0x7FF] = selected_hero_count;
+  int selected_hero_count = 0;
+  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0000")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
+  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0001")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
+  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0002")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
+  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0003")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
+  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0004")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
+  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0005")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
+  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0006")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
+  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0007")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
+  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0008")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
+  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0009")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
 
-      ++selected_hero_count;
-    }
-  }
-
-  XASSERT(player_names.size() == 24, "Player names not complete");
-  XASSERT(selected_hero_count == 24, "Selected heroes not complete");
+  // XASSERT(player_names.size() == 24, "Player names not complete");
+  // XASSERT(selected_hero_count == 24, "Selected heroes not complete");
 }
 
 // This handles CDOTA_Unit_Hero_* entities.
@@ -67,53 +67,35 @@ void update_hero(const Entity &hero) {
   using std::cout;
   using std::endl;
 
-  shared_ptr<IntProperty> life_prop;
-  shared_ptr<VectorXYProperty> origin_prop;
-  shared_ptr<IntProperty> cell_x_prop;
-  shared_ptr<IntProperty> cell_y_prop;
-  shared_ptr<IntProperty> cell_z_prop;
-
   if (selected_hero_id.count(hero.id) == 0) {
     // An illusion.
     return;
   }
 
-  for (auto iter = hero.properties.begin();
-      iter != hero.properties.end();
-      ++iter) {
-    shared_ptr<Property> prop = *iter;
-
-    if (prop->name == "DT_DOTA_BaseNPC.m_iHealth") {
-      life_prop = dynamic_pointer_cast<IntProperty>(prop);
-    } else if (prop->name == "DT_DOTA_BaseNPC.m_vecOrigin") {
-      origin_prop = dynamic_pointer_cast<VectorXYProperty>(prop);
-    } else if (prop->name == "DT_DOTA_BaseNPC.m_cellX") {
-      cell_x_prop = dynamic_pointer_cast<IntProperty>(prop);
-    } else if (prop->name == "DT_DOTA_BaseNPC.m_cellY") {
-      cell_y_prop = dynamic_pointer_cast<IntProperty>(prop);
-    } else if (prop->name == "DT_DOTA_BaseNPC.m_cellZ") {
-      cell_z_prop = dynamic_pointer_cast<IntProperty>(prop);
+  try {
+    int life = hero.properties.at("DT_DOTA_BaseNPC.m_iHealth")->value_as<IntProperty>();
+    if (life > 0) {
+      return;
     }
+
+    int cell_x = hero.properties.at("DT_DOTA_BaseNPC.m_cellX")->value_as<IntProperty>();
+    int cell_y = hero.properties.at("DT_DOTA_BaseNPC.m_cellY")->value_as<IntProperty>();
+    int cell_z = hero.properties.at("DT_DOTA_BaseNPC.m_cellZ")->value_as<IntProperty>();
+    auto origin_prop = dynamic_pointer_cast<VectorXYProperty>(hero.properties.at("DT_DOTA_BaseNPC.m_vecOrigin"));
+
+    cout << tick << "," << hero.id << "," << hero.clazz->name << ",";
+    cout << "\"" << player_names[selected_hero_id[hero.id]] << "\",";
+    cout << life << ",";
+    cout << origin_prop->values[0] << ",";
+    cout << origin_prop->values[1] << ",";
+    cout << cell_x << ",";
+    cout << cell_y << ",";
+    cout << cell_z << endl;
+  } catch(const std::out_of_range& e) {
+    XASSERT(false, "%s", e.what());
+  } catch(const std::bad_cast& e) {
+    XASSERT(false, "%s", e.what());
   }
-
-  XASSERT(life_prop, "Unable to find m_iHealth");
-  XASSERT(origin_prop, "Unable to find m_vecOrigin");
-  XASSERT(cell_x_prop, "Unable to find m_cellX");
-  XASSERT(cell_y_prop, "Unable to find m_cellY");
-  XASSERT(cell_z_prop, "Unable to find m_cellZ");
-
-  if (life_prop->value > 0) {
-    return;
-  }
-
-  cout << tick << "," << hero.id << "," << hero.clazz->name << ",";
-  cout << "\"" << player_names[selected_hero_id[hero.id]] << "\",";
-  cout << life_prop->value << ",";
-  cout << origin_prop->values[0] << ",";
-  cout << origin_prop->values[1] << ",";
-  cout << cell_x_prop->value << ",";
-  cout << cell_y_prop->value << ",";
-  cout << cell_z_prop->value << endl;
 }
 
 void handle_entity(const Entity &entity) {
