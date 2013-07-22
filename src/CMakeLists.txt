@@ -12,12 +12,13 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/../cmake/Modules
 project(edith)
 
 find_package(Protobuf REQUIRED)
-include_directories(${PROTOBUF_INCLUDE_DIR})
+include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 find_package(Snappy)
-include_directories(${SNAPPY_INCLUDE_DIRS})
+include_directories(${SNAPPY_INCLUDE_DIR})
 
 file(GLOB edith_PROTOS proto/*.proto)
+set(PROTOBUF_IMPORT_DIRS ${PROTOBUF_INCLUDE_DIRS})
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${edith_PROTOS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
