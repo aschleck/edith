@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include <stdint.h>
+#include <unordered_map>
 
 class Bitstream;
 class Class;
@@ -22,7 +23,7 @@ public:
   uint32_t id;
   const Class *clazz;
   const FlatSendTable *table;
-  std::vector<std::shared_ptr<Property>> properties;
+  std::unordered_map<std::string, std::shared_ptr<Property>> properties;
 };
 
 #endif
