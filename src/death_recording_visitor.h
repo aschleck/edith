@@ -6,6 +6,7 @@
 //
 // This shows an example usage of this API but is hilariously inefficient and terrible.
 
+#include <array>
 #include <iostream>
 #include <map>
 #include <string>
@@ -14,10 +15,30 @@
 #include "property.h"
 #include "visitor.h"
 
+// TODO: go up to 24 if interested in others, like casters.
+const size_t NUM_PLAYERS_TO_TRACK = 10;
+
 uint32_t tick = 0;
 
-std::array<std::string, 10> player_names;
+std::array<std::string, NUM_PLAYERS_TO_TRACK> player_name_prop_names;
+std::array<std::string, NUM_PLAYERS_TO_TRACK> selected_hero_prop_names;
+
+std::array<std::string, NUM_PLAYERS_TO_TRACK> player_names;
 std::map<uint32_t, uint32_t> selected_hero_id;
+
+// This generates the prop names we're interested in. These are formatted like
+// m_iszPlayerNames.0000 and m_hSelectedHero.0000
+void generate_prop_names() {
+  for (size_t i = 0; i < NUM_PLAYERS_TO_TRACK; ++i) {
+    char as_string[30];
+
+    sprintf(as_string, "m_iszPlayerNames.%04lu", i);
+    player_name_prop_names[i] = as_string;
+
+    sprintf(as_string, "m_hSelectedHero.%04lu", i);
+    selected_hero_prop_names[i] = as_string;
+  }
+}
 
 // This handles the CDOTA_PlayerResource entitiy.
 // We want the 24 send props from the m_iszPlayerNames table named 0000-0023
@@ -28,33 +49,18 @@ void update_name_map(const Entity &player_resource) {
   using std::dynamic_pointer_cast;
   using std::shared_ptr;
 
-  // TODO: go up to 23 (inclusive) if interested in others, like casters.
-  player_names[0] = player_resource.properties.at("m_iszPlayerNames.0000")->value_as<StringProperty>();
-  player_names[1] = player_resource.properties.at("m_iszPlayerNames.0001")->value_as<StringProperty>();
-  player_names[2] = player_resource.properties.at("m_iszPlayerNames.0002")->value_as<StringProperty>();
-  player_names[3] = player_resource.properties.at("m_iszPlayerNames.0003")->value_as<StringProperty>();
-  player_names[4] = player_resource.properties.at("m_iszPlayerNames.0004")->value_as<StringProperty>();
-  player_names[5] = player_resource.properties.at("m_iszPlayerNames.0005")->value_as<StringProperty>();
-  player_names[6] = player_resource.properties.at("m_iszPlayerNames.0006")->value_as<StringProperty>();
-  player_names[7] = player_resource.properties.at("m_iszPlayerNames.0007")->value_as<StringProperty>();
-  player_names[8] = player_resource.properties.at("m_iszPlayerNames.0008")->value_as<StringProperty>();
-  player_names[9] = player_resource.properties.at("m_iszPlayerNames.0009")->value_as<StringProperty>();
-      // Valve packs some additional data in the upper bits, we only care about the lower
-      // ones.
-  int selected_hero_count = 0;
-  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0000")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
-  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0001")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
-  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0002")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
-  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0003")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
-  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0004")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
-  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0005")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
-  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0006")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
-  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0007")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
-  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0008")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
-  selected_hero_id[player_resource.properties.at("m_hSelectedHero.0009")->value_as<IntProperty>() & 0x7FF] = selected_hero_count++;
+  for (size_t i = 0; i < NUM_PLAYERS_TO_TRACK; ++i) {
+    auto name_prop = player_resource.properties.at(player_name_prop_names[i]);
+    player_names[i] = name_prop->value_as<StringProperty>();
+  }
 
-  // XASSERT(player_names.size() == 24, "Player names not complete");
-  // XASSERT(selected_hero_count == 24, "Selected heroes not complete");
+  for (size_t i = 0; i < NUM_PLAYERS_TO_TRACK; ++i) {
+    // Valve packs some additional data in the upper bits, we only care about the lower
+    // ones.
+    auto selected_prop = player_resource.properties.at(selected_hero_prop_names[i]);
+    int id = selected_prop->value_as<IntProperty>() & 0x7FF;
+    selected_hero_id[id] = i;
+  }
 }
 
 // This handles CDOTA_Unit_Hero_* entities.
@@ -92,9 +98,9 @@ void update_hero(const Entity &hero) {
     cout << cell_y << ",";
     cout << cell_z << endl;
   } catch(const std::out_of_range& e) {
-    XASSERT(false, "%s", e.what());
+    XERROR("%s", e.what());
   } catch(const std::bad_cast& e) {
-    XASSERT(false, "%s", e.what());
+    XERROR("%s", e.what());
   }
 }
 
@@ -110,6 +116,8 @@ class DeathRecordingVisitor : public Visitor {
 public:
   DeathRecordingVisitor() {
     std::cout << "tick,entity_id,class_name,player_name,health,x,y,cx,cy,cz" << std::endl;
+
+    generate_prop_names();
   }
 
   virtual void visit_tick(uint32_t t) {
