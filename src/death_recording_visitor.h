@@ -23,8 +23,7 @@ uint32_t tick = 0;
 std::array<std::string, NUM_PLAYERS_TO_TRACK> player_name_prop_names;
 std::array<std::string, NUM_PLAYERS_TO_TRACK> selected_hero_prop_names;
 
-std::array<std::string, NUM_PLAYERS_TO_TRACK> player_names;
-std::map<uint32_t, uint32_t> selected_hero_id;
+std::map<uint32_t, std::string> hero_to_playername;
 
 // This generates the prop names we're interested in. These are formatted like
 // m_iszPlayerNames.0000 and m_hSelectedHero.0000
@@ -46,20 +45,14 @@ void generate_prop_names() {
 // send props from m_hSelectedHero that contain the entity ID of the heroes they
 // selected.
 void update_name_map(const Entity &player_resource) {
-  using std::dynamic_pointer_cast;
-  using std::shared_ptr;
+  for (size_t iPlayer = 0; iPlayer < NUM_PLAYERS_TO_TRACK; ++iPlayer) {
+    auto name_prop = player_resource.properties.at(player_name_prop_names[iPlayer]);
+    auto selected_prop = player_resource.properties.at(selected_hero_prop_names[iPlayer]);
 
-  for (size_t i = 0; i < NUM_PLAYERS_TO_TRACK; ++i) {
-    auto name_prop = player_resource.properties.at(player_name_prop_names[i]);
-    player_names[i] = name_prop->value_as<StringProperty>();
-  }
-
-  for (size_t i = 0; i < NUM_PLAYERS_TO_TRACK; ++i) {
     // Valve packs some additional data in the upper bits, we only care about the lower
     // ones.
-    auto selected_prop = player_resource.properties.at(selected_hero_prop_names[i]);
-    int id = selected_prop->value_as<IntProperty>() & 0x7FF;
-    selected_hero_id[id] = i;
+    int heroid = selected_prop->value_as<IntProperty>() & 0x7FF;
+    hero_to_playername[heroid] = name_prop->value_as<StringProperty>();
   }
 }
 
@@ -73,7 +66,7 @@ void update_hero(const Entity &hero) {
   using std::cout;
   using std::endl;
 
-  if (selected_hero_id.count(hero.id) == 0) {
+  if (hero_to_playername.count(hero.id) == 0) {
     // An illusion.
     return;
   }
@@ -90,7 +83,7 @@ void update_hero(const Entity &hero) {
     auto origin_prop = dynamic_pointer_cast<VectorXYProperty>(hero.properties.at("DT_DOTA_BaseNPC.m_vecOrigin"));
 
     cout << tick << "," << hero.id << "," << hero.clazz->name << ",";
-    cout << "\"" << player_names[selected_hero_id[hero.id]] << "\",";
+    cout << "\"" << hero_to_playername[hero.id] << "\",";
     cout << life << ",";
     cout << origin_prop->values[0] << ",";
     cout << origin_prop->values[1] << ",";
