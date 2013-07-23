@@ -15,12 +15,9 @@ Quick start:
     make
     ./edith <a replay>
 
-If make can't generate the protocol buffers then you may need to find the directory
-containing google/protobuf/descriptor.proto and do:
-
-    cmake -DPROTOBUF_IMPORT_DIRS=/usr/local/include ../src
-
-replacing /usr/local/include.
+If you encounter errors compiling the protocol buffers, make sure the CMake variable
+**PROTOBUF_INCLUDE_DIR** points to the directory containing google/protobuf/descriptor.proto.
+The other **PROTOBUF_** variables should be set as well.
 
 Your C++ is terrible:
 --------------------
