@@ -18,7 +18,7 @@ void read_field_number(uint32_t &last_field, Bitstream &stream) {
     last_field += 1;
   } else {
     size_t start = stream.get_position();
-    uint32_t value = stream.read_var_35();
+    uint32_t value = stream.read_var_uint();
 
     if (value == 0x3FFF) {
       last_field = 0xFFFFFFFF;

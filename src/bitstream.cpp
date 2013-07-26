@@ -82,7 +82,7 @@ void Bitstream::read_string(char *buffer, size_t size) {
   buffer[size - 1] = '\0';
 }
 
-uint32_t Bitstream::read_var_35() {
+uint32_t Bitstream::read_var_uint() {
   size_t read = 0;
 
   uint32_t value = 0;
@@ -98,19 +98,5 @@ uint32_t Bitstream::read_var_35() {
   } while ((got >> 7) && read < 35);
 
   return value;
-}
-
-uint32_t Bitstream::read_var_uint() {
-  XASSERT(!eof(), "End stream.");
-
-  uint32_t ret = get_bits(6);
-
-  switch (ret & (16 | 32)) {
-    case 16: ret = (ret & 15) | (get_bits(4) << 4); break;
-    case 32: ret = (ret & 15) | (get_bits(8) << 4); break;
-    case 48: ret = (ret & 15) | (get_bits(28) << 4); break;
-  }
-
-  return ret;
 }
 

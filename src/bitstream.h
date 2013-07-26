@@ -19,7 +19,6 @@ class Bitstream {
     uint32_t get_bits(size_t n);
     void read_bits(void *buffer, size_t bit_length);
     void read_string(char *buffer, size_t size);
-    uint32_t read_var_35();
     uint32_t read_var_uint();
 
   private:

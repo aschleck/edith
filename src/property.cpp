@@ -7,9 +7,9 @@
 uint32_t read_int(Bitstream &stream, const SendProp *prop) {
   if (prop->flags & SP_EncodedAgainstTickcount) {
     if (prop->flags & SP_Unsigned) {
-      return stream.read_var_35();
+      return stream.read_var_uint();
     } else {
-      uint32_t value = stream.read_var_35();
+      uint32_t value = stream.read_var_uint();
       return (-(value & 1)) ^ (value >> 1);
     }
   } else {
