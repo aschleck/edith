@@ -44,7 +44,8 @@ uint32_t Bitstream::get_bits(size_t n) {
   a >>= read;
   b <<= 32 - read;
 
-  uint32_t mask = (1 << n) - 1;
+  // cast up to 64 because 1 << 32 will be 0 otherwise
+  uint32_t mask = (uint32_t)(((uint64_t)1 << n) - 1);
   uint32_t ret = (a | b) & mask;
   
   position += n;
