@@ -94,7 +94,9 @@ float read_float_coord_mp(Bitstream &stream, FloatType type) {
 }
 
 float read_float_no_scale(Bitstream &stream) {
-  return stream.get_bits(32);
+  union { float f; uint32_t v; } u;
+  u.v = stream.get_bits(32);
+  return u.f;
 }
 
 float read_float_normal(Bitstream &stream) {
