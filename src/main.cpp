@@ -24,7 +24,6 @@ enum UpdateFlag {
 };
 
 State *state = 0;
-Visitor *visitor = new DeathRecordingVisitor();
 
 uint32_t read_var_int(const char *data, size_t length, size_t *offset) {
   uint32_t b;
@@ -126,7 +125,7 @@ uint32_t read_entity_header(uint32_t *base, Bitstream &stream) {
   return update_flags;
 }
 
-void read_entity_enter_pvs(uint32_t entity_id, Bitstream &stream) {
+void read_entity_enter_pvs(uint32_t entity_id, Bitstream &stream, Visitor& visitor) {
   uint32_t class_i = stream.get_bits(state->class_bits);
   uint32_t serial = stream.get_bits(10);
 
@@ -138,7 +137,7 @@ void read_entity_enter_pvs(uint32_t entity_id, Bitstream &stream) {
   Entity &entity = state->entities[entity_id];
 
   if (entity.id != -1) {
-    visitor->visit_entity_deleted(entity);
+    visitor.visit_entity_deleted(entity);
   }
 
   entity = Entity(entity_id, clazz, flat_send_table);
@@ -149,10 +148,10 @@ void read_entity_enter_pvs(uint32_t entity_id, Bitstream &stream) {
 
   entity.update(stream);
 
-  visitor->visit_entity_created(entity);
+  visitor.visit_entity_created(entity);
 }
 
-void read_entity_update(uint32_t entity_id, Bitstream &stream) {
+void read_entity_update(uint32_t entity_id, Bitstream &stream, Visitor& visitor) {
   XASSERT(entity_id < MAX_ENTITIES, "Entity id too big");
 
   Entity &entity = state->entities[entity_id];
@@ -160,10 +159,10 @@ void read_entity_update(uint32_t entity_id, Bitstream &stream) {
 
   entity.update(stream);
 
-  visitor->visit_entity_updated(entity);
+  visitor.visit_entity_updated(entity);
 }
 
-void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
+void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities, Visitor& visitor) {
   Bitstream stream(entities.entity_data());
 
   uint32_t entity_id = -1;
@@ -174,17 +173,17 @@ void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
     update_type = read_entity_header(&entity_id, stream);
 
     if (update_type & UF_EnterPVS) {
-      read_entity_enter_pvs(entity_id, stream);
+      read_entity_enter_pvs(entity_id, stream, visitor);
     } else if (update_type & UF_LeavePVS) {
       XASSERT(entities.is_delta(), "Leave PVS on full update");
 
       if (update_type & UF_Delete) {
-        visitor->visit_entity_deleted(state->entities[entity_id]);
+        visitor.visit_entity_deleted(state->entities[entity_id]);
 
         state->entities[entity_id].id = -1;
       }
     } else {
-      read_entity_update(entity_id, stream);
+      read_entity_update(entity_id, stream, visitor);
     }
 
     ++found;
@@ -193,7 +192,7 @@ void dump_SVC_PacketEntities(const CSVCMsg_PacketEntities &entities) {
   if (entities.is_delta()) {
     while (stream.get_bits(1)) {
       entity_id = stream.get_bits(11);
-      visitor->visit_entity_deleted(state->entities[entity_id]);
+      visitor.visit_entity_deleted(state->entities[entity_id]);
       state->entities[entity_id].id = -1;
     }
   }
@@ -348,18 +347,18 @@ void handle_SVC_UpdateStringTable(const CSVCMsg_UpdateStringTable &update) {
   update_string_table(table, update.num_changed_entries(), update.string_data());
 }
 
-void clear_entities() {
+void clear_entities(Visitor& visitor) {
   for (size_t i = 0; i < MAX_ENTITIES; ++i) {
     Entity &entity = state->entities[i];
 
     if (entity.id != -1) {
-      visitor->visit_entity_deleted(entity);
+      visitor.visit_entity_deleted(entity);
       entity.id = -1;
     }
   }
 }
 
-void dump_DEM_Packet(const CDemoPacket &packet) {
+void dump_DEM_Packet(const CDemoPacket &packet, Visitor& visitor) {
   const char *data = packet.data().c_str();
   size_t offset = 0;
   size_t length = packet.data().length();
@@ -378,7 +377,7 @@ void dump_DEM_Packet(const CDemoPacket &packet) {
       CSVCMsg_PacketEntities entities;
       entities.ParseFromArray(&(data[offset]), size);
 
-      dump_SVC_PacketEntities(entities);
+      dump_SVC_PacketEntities(entities, visitor);
     } else if (command == svc_CreateStringTable) {
       CSVCMsg_CreateStringTable table;
       table.ParseFromArray(&(data[offset]), size);
@@ -395,7 +394,7 @@ void dump_DEM_Packet(const CDemoPacket &packet) {
   }
 }
 
-void dump(const char *file) {
+void dump(const char *file, Visitor& visitor) {
   Demo demo(file);
 
   for (int frame = 0; !demo.eof(); ++frame) {
@@ -407,7 +406,7 @@ void dump(const char *file) {
     EDemoCommands command = demo.get_message_type(&tick, &compressed);
     demo.read_message(compressed, &size, &uncompressed_size);
 
-    visitor->visit_tick(tick);
+    visitor.visit_tick(tick);
 
     if (command == DEM_ClassInfo) {
       CDemoClassInfo info;
@@ -423,7 +422,7 @@ void dump(const char *file) {
       CDemoPacket packet;
       packet.ParseFromArray(demo.expose_buffer(), uncompressed_size);
 
-      dump_DEM_Packet(packet);
+      dump_DEM_Packet(packet, visitor);
     }
   }
 }
@@ -431,11 +430,11 @@ void dump(const char *file) {
 int main(int argc, char **argv) {
   if (argc <= 1) {
     printf("Usage: %s something.dem\n", argv[0]);
-    exit(1);
-  } else {
-    dump(argv[1]);
+    return 1;
   }
 
+  DeathRecordingVisitor v;
+  dump(argv[1], v);
   return 0;
 }
 
