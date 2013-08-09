@@ -347,17 +347,6 @@ void handle_SVC_UpdateStringTable(const CSVCMsg_UpdateStringTable &update) {
   update_string_table(table, update.num_changed_entries(), update.string_data());
 }
 
-void clear_entities(Visitor& visitor) {
-  for (size_t i = 0; i < MAX_ENTITIES; ++i) {
-    Entity &entity = state->entities[i];
-
-    if (entity.id != -1) {
-      visitor.visit_entity_deleted(entity);
-      entity.id = -1;
-    }
-  }
-}
-
 void dump_DEM_Packet(const CDemoPacket &packet, Visitor& visitor) {
   const char *data = packet.data().c_str();
   size_t offset = 0;
