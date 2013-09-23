@@ -10,6 +10,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <stdexcept>
 
 #include "debug.h"
 #include "property.h"
@@ -62,7 +63,6 @@ void update_name_map(const Entity &player_resource) {
 // it.
 void update_hero(const Entity &hero) {
   using std::dynamic_pointer_cast;
-  using std::shared_ptr;
   using std::cout;
   using std::endl;
 
