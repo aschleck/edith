@@ -25,6 +25,7 @@ std::array<std::string, NUM_PLAYERS_TO_TRACK> player_name_prop_names;
 std::array<std::string, NUM_PLAYERS_TO_TRACK> selected_hero_prop_names;
 
 std::map<uint32_t, std::string> hero_to_playername;
+std::map<uint32_t, int> hero_previous_life;
 
 // This generates the prop names we're interested in. These are formatted like
 // m_iszPlayerNames.0000 and m_hSelectedHero.0000
@@ -73,9 +74,16 @@ void update_hero(const Entity &hero) {
 
   try {
     int life = hero.properties.at("DT_DOTA_BaseNPC.m_iHealth")->value_as<IntProperty>();
-    if (life > 0) {
+    // Note that we get multiple entity updates even when it died, but we
+    // only want one output per death. That's why we only output stuff when
+    // the life drops below zero for the first time.
+    // (Think of someone dying from the hook, its corpse gets carried along but
+    //  we are only interested in the death moment!)
+    if (life > 0 || hero_previous_life[hero.id] <= 0) {
+      hero_previous_life[hero.id] = life;
       return;
     }
+    hero_previous_life[hero.id] = life;
 
     int cell_x = hero.properties.at("DT_DOTA_BaseNPC.m_cellX")->value_as<IntProperty>();
     int cell_y = hero.properties.at("DT_DOTA_BaseNPC.m_cellY")->value_as<IntProperty>();
