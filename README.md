@@ -13,7 +13,7 @@ Quick start:
     cd build
     ccmake ../
     make
-    ./edith <a replay>
+    ./death_recording <a replay>
 
 If you encounter errors compiling the protocol buffers, make sure the CMake variable
 **PROTOBUF_INCLUDE_DIR** points to the directory containing google/protobuf/descriptor.proto.
@@ -77,20 +77,19 @@ Deleting an entity only requires transferring the ID of the entity.
 
 Understanding the code:
 ----------------------
-**death_recording_visitor** is an example of doing something useful with my code. This
-outputs a line whenever an entity is updated while dead (which is way more times
-than actual deaths). This was used to gather data for the tool that produced the image
+**examples/death_recording_visitor** is an example of doing something useful with my code. This
+outputs a line whenever a hero dies. This was used to gather data for the tool that produced the image
 above.
 
-**entity** describes an entity and stores its properties.
+**src/entity** describes an entity and stores its properties.
 
-**property** handles the different types of send props and stores the correct data for
+**src/property** handles the different types of send props and stores the correct data for
 each one.
 
-**state** contains a bunch of data structures read from the replay and handles flattening
+**src/state** contains a bunch of data structures read from the replay and handles flattening
 send tables.
 
-**main** reads the replay, converts it into the internal representation used by the program,
+**src/edith** reads the replay, converts it into the internal representation used by the program,
 and runs the logic for everything but flattening send tables.
 
 Limitations:
