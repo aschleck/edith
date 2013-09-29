@@ -31,5 +31,5 @@ add_library(edith ${edith_SOURCES} ${PROTO_SRCS} ${PROTO_HDRS})
 target_link_libraries(edith ${PROTOBUF_LIBRARY} ${SNAPPY_LIBRARY})
 include_directories("${PROJECT_SOURCE_DIR}/src/")
 
-add_executable(death_recording dumpers/death_recording.cpp)
+add_executable(death_recording examples/death_recording.cpp)
 target_link_libraries(death_recording edith)
