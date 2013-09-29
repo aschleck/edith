@@ -11,7 +11,7 @@ A Dota 2 replay (.dem) parser that understands packet entities. Tested on OS X a
 Quick start:
 ------------
     cd build
-    ccmake ../src
+    ccmake ../
     make
     ./edith <a replay>
 
