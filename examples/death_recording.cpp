@@ -1,20 +1,18 @@
-#ifndef _DEATH_RECORDING_VISITOR_H
-#define _DEATH_RECORDING_VISITOR_H
-
 // Maps player names to the entity of the hero they selected and outputs the position
 // of that hero everytime they are updated and their health is set to zero.
 //
 // This shows an example usage of this API but is hilariously inefficient and terrible.
 
-#include <array>
-#include <iostream>
-#include <map>
-#include <string>
 #include <stdexcept>
+#include <iostream>
+#include <string>
+#include <array>
+#include <map>
 
 #include "debug.h"
 #include "property.h"
 #include "visitor.h"
+#include "edith.h"
 
 // TODO: go up to 24 if interested in others, like casters.
 const size_t NUM_PLAYERS_TO_TRACK = 10;
@@ -137,4 +135,14 @@ public:
   }
 };
 
-#endif
+int main(int argc, char **argv) {
+    if (argc <= 1) {
+        std::cerr << "Usage: " << argv[0] << " something.dem" << std::endl;
+        return 1;
+    }
+
+    DeathRecordingVisitor visitor;
+    dump(argv[1], visitor);
+    return 0;
+}
+
