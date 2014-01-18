@@ -249,12 +249,6 @@ void read_string_table_key(uint32_t first_bit, Bitstream &stream, char *buf,
 }
 
 void update_string_table(StringTable &table, size_t num_entries, const std::string &data) {
-  // These do something with precaches. This isn't a client so I'm assuming this
-  // is irrelevant.
-  if (table.flags & 2) {
-    return;
-  }
-
   Bitstream stream(data);
 
   uint32_t first_bit = stream.get_bits(1);
@@ -292,7 +286,7 @@ void update_string_table(StringTable &table, size_t num_entries, const std::stri
     size_t bit_length = 0;
     size_t length = 0;
     if (stream.get_bits(1)) {
-      if (table.flags & ST_FixedLength) {
+      if (table.user_data_fixed_size) {
         length = table.user_data_size;
         bit_length = table.user_data_size_bits;
       } else {
@@ -332,8 +326,8 @@ void handle_SVC_CreateStringTable(const CSVCMsg_CreateStringTable &table) {
   XASSERT(state, "SVC_CreateStringTable but no state.");
 
   StringTable &converted = state->create_string_table(table.name(),
-      (size_t) table.max_entries(), table.flags(), table.user_data_fixed_size(),
-      table.user_data_size(), table.user_data_size_bits());
+      (size_t) table.max_entries(), table.user_data_fixed_size(),
+      table.user_data_size(), table.user_data_size_bits(), table.flags());
 
   update_string_table(converted, table.num_entries(), table.string_data());
 }

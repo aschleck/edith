@@ -120,11 +120,6 @@ public:
   DTProp dt_prop;
 };
 
-enum ST_Flags {
-  ST_Something = 2,
-  ST_FixedLength = 8,
-};
-
 class StringTableEntry {
 public:
   StringTableEntry();
