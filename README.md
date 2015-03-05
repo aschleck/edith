@@ -21,9 +21,12 @@ The other **PROTOBUF_** variables should be set as well.
 
 Your C++ is terrible:
 --------------------
-I am very bad at C++ and stopped caring the moment this worked, sorry. What I'm hoping
-will happen is someone intelligent will use this as a reference to write this the right
-way.
+This is a reverse engineering project and I stopped caring the moment this worked, sorry. The great
+news is others have used this as a reference to write this better!
+
+* [Yasha](https://github.com/dotabuff/yasha)
+* [Alice](https://github.com/AliceStats/Alice)
+* [Clarity](https://github.com/skadistats/clarity)
 
 Overview:
 ---------
